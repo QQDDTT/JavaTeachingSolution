@@ -178,7 +178,21 @@ Windows 使用方法（PowerShell / BAT）
 
 ## 📦 依赖管理
 
-- 本项目依赖 Maven 中央仓库，由父项目统一管理：
-- javax.servlet-api → Web 项目 Servlet 支持
-junit → 单元测试
-其他依赖可在 pom.xml 中集中配置
+父项目统一管理各模块常用依赖，方便子模块继承，减少版本冲突：
+
+| 依赖名称         | GroupId                       | ArtifactId                | Version    | Scope    | 用途说明                             |
+|-----------------|-------------------------------|---------------------------|-----------|---------|------------------------------------|
+| Jetty Server     | org.eclipse.jetty             | jetty-server              | 11.0.17  | 默认    | 提供 HTTP/Web 服务器功能            |
+| Jetty Servlet 支持 | org.eclipse.jetty           | jetty-servlet             | 11.0.17  | 默认    | 支持 Servlet 功能                   |
+| Jetty 扩展 Servlets | org.eclipse.jetty          | jetty-servlets            | 11.0.17  | 默认    | 提供附加 Servlet 功能（如 DefaultServlet） |
+| Jetty WebSocket  | org.eclipse.jetty.websocket   | websocket-jetty-server    | 11.0.17  | 默认    | WebSocket 支持                      |
+| Servlet API      | jakarta.servlet              | jakarta.servlet-api       | 6.0.0    | provided | Web 模块使用的 Servlet 接口          |
+| JSON 支持        | com.fasterxml.jackson.core   | jackson-databind          | 2.16.2   | 默认    | JSON 序列化与反序列化               |
+| JUnit 测试       | junit                        | junit                     | 4.13.2   | test    | 单元测试框架                         |
+| Common 模块      | com.javateaching             | common                    | 1.0-SNAPSHOT | 默认 | 父模块下公共类库                     |
+
+
+## 🛠️ 构建与环境配置
+
+- Maven Compiler 插件：3.11.0
+- Java 编译版本：21
