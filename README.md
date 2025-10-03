@@ -75,15 +75,17 @@ JavaTeachingSolution
 │       └── WebServerTest.java
 ```
 
+
 ## ⚙️ 构建与运行
 
-1. 构建整个项目
+### 1. 构建整个项目
 
 ```bash
 mvn clean install
 ```
 
-2. 运行控制台子项目
+
+### 2. 运行控制台子项目
 
 - 进入控制台子项目目录，例如 Console.Example：
 
@@ -92,7 +94,8 @@ cd console_example
 java -jar target/console_example-1.0-SNAPSHOT.jar arg1 arg2
 ```
 
-3. 运行 Web 子项目
+
+### 3. 运行 Web 子项目
 - 进入 Web 子项目目录，例如 web_example：
 
 ```bash
@@ -100,7 +103,8 @@ cd web_example
 java -jar target/web_example-1.0-SNAPSHOT.jar arg1 arg2
 ```
 
-4. core 项目
+
+### 4. core 项目
 
 core 模块是 控制台核心库，提供：
 
@@ -122,7 +126,8 @@ java -jar target/core-1.0-SNAPSHOT.jar
 - 支持控制台和 Web 子项目
 - 可扩展新子项目，无需改动 CoreRunner
 
-5. Core Web 模块说明（core_web）
+
+### 5. Core Web 模块说明（core_web）
 
 core_web 模块是 Web 管理控制台，目标：
 - 统一展示所有已注册的子项目（控制台/Web）
@@ -138,6 +143,35 @@ cd core_web
 mvn clean package
 # 运行 Web 控制台
 java -jar target/core_web-1.0-SNAPSHOT.jar
+```
+
+### 6. 创建新的子项目
+
+Linux 使用方法（Bash 脚本）
+- 脚本需有可执行权限：chmod +x CreateWebProject.sh
+- 系统需已安装 Maven 和 JDK
+- code 命令需在 PATH 中可用
+
+```bash
+./CreateWebProject.sh Demo
+```
+
+Windows 使用方法（PowerShell / BAT）
+
+- BAT 文件会自动使用 ExecutionPolicy Bypass，无需修改系统策略
+- 系统需已安装 Maven 和 JDK
+- code 命令需在 PATH 中可用
+
+- 通过 BAT 文件启动（推荐）
+
+```bat
+ CreateWebProject.bat Demo
+```
+
+- 直接在 PowerShell 中运行
+
+```powershell
+.\CreateWebProject.ps1 -ProjectName Demo
 ```
 
 ## 📦 依赖管理
