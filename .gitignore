@@ -1,0 +1,55 @@
+# =========================
+# Maven / Java 常用忽略
+# =========================
+
+# 编译输出目录
+**/target/
+**/out/
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+
+# 包和 JAR 文件（可以根据需求保留）
+*.jar
+*.war
+*.ear
+
+# =========================
+# IDE 相关
+# =========================
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+out/
+
+# Eclipse
+*.classpath
+*.project
+*.settings/
+bin/
+
+# VS Code
+.vscode/
+
+# =========================
+# 系统相关
+# =========================
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =========================
+# Maven Wrapper
+# =========================
+.mvn/wrapper/maven-wrapper.jar
