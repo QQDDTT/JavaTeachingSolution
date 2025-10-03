@@ -129,9 +129,7 @@ java -jar target/core-1.0-SNAPSHOT.jar
 
 ### 5. Core Web 模块说明（core_web）
 
-::: warning
-**警告**：该模块开发中
-:::
+⚠️ **警告**：该模块开发中，相关功能尚未完善
 
 core_web 模块是 Web 管理控制台，目标：
 - 统一展示所有已注册的子项目（控制台/Web）
