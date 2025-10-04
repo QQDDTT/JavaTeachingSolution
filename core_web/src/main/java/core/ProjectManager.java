@@ -61,7 +61,7 @@ public class ProjectManager {
             try (OutputStream out = Files.newOutputStream(filePath,
                     StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING)) {
-                long bytesWritten = inputStream.transferTo(out); // 返回写入字节数
+                inputStream.transferTo(out); // 返回写入字节数
             }
 
             return ResponseData.success("Write file success: " + relativePath, Map.of());
