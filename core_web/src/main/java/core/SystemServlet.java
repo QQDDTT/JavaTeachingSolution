@@ -87,22 +87,26 @@ public class SystemServlet extends HttpServlet {
     private String getScriptName(String action) {
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
 
-        return switch (action.toLowerCase()) {
+        String scriptFile = switch (action.toLowerCase()) {
             case "restart" -> isWindows ? RESTART_WIN : RESTART_LINUX;
-            case "close" -> isWindows ? CLOSE_WIN : CLOSE_LINUX;
+            case "close"   -> isWindows ? CLOSE_WIN : CLOSE_LINUX;
             default -> null;
         };
+
+        if (scriptFile == null) return null;
+
+        return "scripts/" + scriptFile; // 拼接文件夹路径
     }
+
 
     /**
      * 检查脚本是否存在于当前工作目录
      */
     private boolean checkScriptExists(String action) {
-        String scriptName = getScriptName(action);
-        if (scriptName == null) return false;
+        String scriptPath = getScriptName(action);
+        if (scriptPath == null) return false;
 
-        Path scriptPath = Paths.get(".", scriptName);
-        return Files.exists(scriptPath);
+        return Files.exists(Paths.get(scriptPath));
     }
 
     /**

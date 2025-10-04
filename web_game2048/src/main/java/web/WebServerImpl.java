@@ -7,11 +7,6 @@ import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.resource.Resource;
 
-import jakarta.servlet.http.*;
-import jakarta.servlet.ServletException;
-
-import java.io.IOException;
-
 
 /**
  * Web 子项目 Server 实现
