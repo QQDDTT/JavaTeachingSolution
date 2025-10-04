@@ -129,22 +129,16 @@ java -jar target/core-1.0-SNAPSHOT.jar
 
 ### 5. Core Web 模块说明（core_web）
 
-⚠️ **警告**：该模块开发中，相关功能尚未完善
-
 core_web 模块是 Web 管理控制台，目标：
 - 统一展示所有已注册的子项目（控制台/Web）
-- 提供 Web 页面操作入口：
- - 启动/停止子项目
- - 创建/修改子项目
- - 在线监控运行状态
+- 操作终端，用于执行子项目 （能够启动core，但暂时不能a交互）
+- 文本编辑器，修改子项目代码和资源文件（core和core_web未开放，暂时不具备编译功能）
 
 ```bash
-# 进入 core_web 模块目录
-cd core_web
 # 编译打包
 mvn clean package
 # 运行 Web 控制台
-java -jar target/core_web-1.0-SNAPSHOT.jar
+java -jar ./core_web/target/core_web-1.0-SNAPSHOT.jar
 ```
 
 ### 6. 创建新的子项目
