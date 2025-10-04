@@ -6,7 +6,10 @@ Param(
 $ModuleName = "console_$ProjectName"
 
 # 父项目路径（假设脚本放在父项目 scripts/ 目录下）
-$ParentDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+# 当前脚本所在目录
+$CurrentDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+# 上一级目录
+$ParentDir = Split-Path -Parent $CurrentDir
 $ParentPom = Join-Path $ParentDir "pom.xml"
 
 # ---------- 1. 创建目录结构 ----------

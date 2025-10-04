@@ -15,7 +15,8 @@
         <module>core_web</module>
         <module>console_demo</module>
         <module>web_demo</module>
-    <module>web_game2048</module>
+        <module>web_game2048</module>
+    <module>web_gobang</module>
     </modules>
 
     <dependencyManagement>

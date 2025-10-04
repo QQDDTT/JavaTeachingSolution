@@ -19,7 +19,7 @@ PROJECT_NAME=$1
 MODULE_NAME="console_${PROJECT_NAME}"
 
 # 父项目路径（假设脚本放在父项目 scripts/ 目录下）
-PARENT_DIR=$(dirname "$(realpath "$0")")
+PARENT_DIR=$(dirname "$(dirname "$(realpath "$0")")")
 PARENT_POM="$PARENT_DIR/pom.xml"
 
 # ---------- 1. 创建目录结构 ----------

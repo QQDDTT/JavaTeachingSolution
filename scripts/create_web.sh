@@ -8,7 +8,7 @@ fi
 PROJECT_NAME=$1
 MODULE_NAME="web_${PROJECT_NAME}"
 
-PARENT_DIR=$(dirname "$(realpath "$0")")
+PARENT_DIR=$(dirname "$(dirname "$(realpath "$0")")")
 PARENT_POM="$PARENT_DIR/pom.xml"
 
 # ---------- 计算端口号 ----------
@@ -35,9 +35,12 @@ package web;
 public class WebServer {
 
     public static void main(String[] args) throws Exception {
+        int port = args.length > 0 ? Integer.parseInt(args[0]) : 8080;
+        boolean sslEnabled = args.length > 1 ? Boolean.parseBoolean(args[1]) : false;
+        int sessionTimeout = args.length > 2 ? Integer.parseInt(args[2]) : 600;
 
         WebServerImpl serverImpl = new WebServerImpl();
-        serverImpl.start(8080, false, 3600);
+        serverImpl.start(port, sslEnabled, sessionTimeout);
 
         // 阻塞线程，保证服务存活
         Thread.currentThread().join();

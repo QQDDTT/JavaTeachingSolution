@@ -4,7 +4,10 @@ Param(
 )
 
 $ModuleName = "web_$ProjectName"
-$ParentDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+# 当前脚本所在目录
+$CurrentDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+# 上一级目录
+$ParentDir = Split-Path -Parent $CurrentDir
 $ParentPom = Join-Path $ParentDir "pom.xml"
 
 # ---------- 计算端口号 ----------
@@ -32,10 +35,12 @@ package web;
 public class WebServer {
 
     public static void main(String[] args) throws Exception {
+        int port = args.length > 0 ? Integer.parseInt(args[0]) : 8080;
+        boolean sslEnabled = args.length > 1 ? Boolean.parseBoolean(args[1]) : false;
+        int sessionTimeout = args.length > 2 ? Integer.parseInt(args[2]) : 600;
 
         WebServerImpl serverImpl = new WebServerImpl();
-        serverImpl.start(8080, false, 3600);
-
+        serverImpl.start(port, sslEnabled, sessionTimeout);
         // 阻塞线程，保证服务存活
         Thread.currentThread().join();
     }
