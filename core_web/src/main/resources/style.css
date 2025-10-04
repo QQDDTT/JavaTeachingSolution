@@ -1,54 +1,187 @@
+/* 全局 */
 html, body {
     margin: 0;
+    padding: 0;
     height: 100%;
-    font-family: Arial, sans-serif;
+    width: 100%;
+    font-family: sans-serif;
+    background: #f5f5f5;
+    overflow: hidden;
 }
 
-#container {
+#appContainer {
     display: flex;
+    flex-direction: column;
     height: 100%;
 }
 
-#sidebar {
-    width: 200px;
-    background-color: #2c3e50;
+/* 工具栏 */
+#toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #333;
     color: white;
-    padding: 10px;
-    box-sizing: border-box;
+    padding: 5px 10px;
+    flex-shrink: 0;
+}
+
+#toolbar button.active {
+  background: #007acc;
+}
+
+.left-buttons, .right-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+#statusBarContainer {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+}
+
+#statusBar {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: scrollText 10s linear infinite;
+}
+
+/* 滚动效果 */
+@keyframes scrollText {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+/* 主体 */
+#main {
+    flex: 1;
+    position: relative;
+}
+
+/* 选项卡 */
+.tab-content {
+    display: none;
+    height: 100%;
+}
+
+.tab-content.active {
     display: flex;
     flex-direction: column;
 }
 
-#sidebar select, #sidebar button {
-    margin-bottom: 10px;
-    width: 100%;
+/* 控制台 */
+#consoleOutput {
+    flex: 1;
+    padding: 10px;
+    background: black;
+    color: #0f0;
+    font-family: monospace;
+    overflow-y: auto;
+}
+
+#consoleInputBar {
+    display: flex;
+    border-top: 1px solid #444;
+}
+
+#consoleInput {
+    flex: 1;
+    padding: 6px;
+    border: none;
+}
+
+#sendConsoleBtn {
+    padding: 6px 12px;
+}
+
+/* 编辑器 */
+#editorContainer {
+    flex: 1;
+    display: flex;
+    height: calc(100% - 40px); /* 留出编辑器工具栏高度 */
+    position: relative;
+}
+
+/* 侧边栏 */
+#editorSidebar {
+    width: 200px;
+    min-width: 100px;
+    background: #eee;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#projectSelect {
+    flex-shrink: 0;
     padding: 5px;
 }
 
-#main {
+#fileList {
     flex: 1;
-    display: flex;
-    flex-direction: column;
+    overflow-y: auto;
+    border-top: 1px solid #ccc;
 }
 
-.panel {
-    flex: 1;
-    display: none;
-    padding: 10px;
-    box-sizing: border-box;
-    overflow: auto;
-    font-family: monospace;
-    font-size: 14px;
-    background-color: #1e1e1e;
-    color: #dcdcdc;
+/* 拖动条 */
+#dragHandle {
+    width: 5px;
+    cursor: col-resize;
+    background: #ccc;
 }
 
-.panel.visible {
-    display: block;
-}
-
+/* 编辑器文本区 */
 #editor {
+    flex: 1;
+    border: none;
+    font-family: monospace;
+    padding: 10px;
     resize: none;
-    width: 100%;
-    height: 100%;
+    overflow: auto;
+}
+
+/* 编辑器工具栏 */
+#editorToolbar {
+    height: 40px;
+    background: #ddd;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    gap: 10px;
+}
+
+/* 弹窗 */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 4px;
+}
+
+/* 休眠遮罩 */
+#sleepOverlay {
+    display: none;
+    position: fixed;
+    top:0; left:0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    font-size: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
 }

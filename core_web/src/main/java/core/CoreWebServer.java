@@ -1,10 +1,17 @@
 package core;
 
+import java.io.IOException;
+
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.resource.Resource;
+
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 public class CoreWebServer {
 
@@ -24,15 +31,20 @@ public class CoreWebServer {
         staticHolder.setInitParameter("dirAllowed", "true"); // 可选：显示目录结构
         context.addServlet(staticHolder, "/"); // 根路径映射静态资源
         
-        // API Servlets
-        context.addServlet(ModuleListServlet.class, "/api/modules");
-        context.addServlet(RunModuleServlet.class, "/api/run/*");
-        context.addServlet(FileTreeServlet.class, "/api/filetree/*");
-        context.addServlet(FileSaveServlet.class, "/api/save/*");
-        context.addServlet(NewModuleServlet.class, "/api/new/*");
-        context.addServlet(RestartServlet.class, "/api/restart");
+        // ----------------------------
+        // 匿名类实现心跳 Servlet
+        // ----------------------------
+        context.addServlet(new ServletHolder(new HttpServlet() {
+            @Override
+            protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+                resp.setContentType("text/plain;charset=UTF-8");
+                resp.getWriter().write("OK");  // 返回心跳成功
+            }
+        }), "/heartbeat");
 
-        
+        // API Servlets
+        context.addServlet(ProjectServlet.class, "/project");
+
 
         server.setHandler(context);
         server.start();
