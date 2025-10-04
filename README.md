@@ -131,8 +131,8 @@ java -jar target/core-1.0-SNAPSHOT.jar
 
 core_web 模块是 Web 管理控制台，目标：
 - 统一展示所有已注册的子项目（控制台/Web）
-- 操作终端，用于执行子项目 （能够启动core，但暂时不能a交互）
-- 文本编辑器，修改子项目代码和资源文件（core和core_web未开放，暂时不具备编译功能）
+- 操作终端，用于执行子项目 （能够启动core，但暂时不能a交互）❓
+- 文本编辑器，修改子项目代码和资源文件（core和core_web未开放，暂时不具备编译功能）❓
 
 ```bash
 # 编译打包
@@ -141,7 +141,7 @@ mvn clean package
 java -jar ./core_web/target/core_web-1.0-SNAPSHOT.jar
 ```
 
-### 6. 创建新的子项目
+### 6. 执行脚本
 
 Linux 使用方法（Bash 脚本）
 - 脚本需有可执行权限：chmod +x CreateWebProject.sh
@@ -149,7 +149,7 @@ Linux 使用方法（Bash 脚本）
 - code 命令需在 PATH 中可用
 
 ```bash
-./CreateWebProject.sh Demo
+./scripts/<脚本名>.sh <项目名>
 ```
 
 Windows 使用方法（PowerShell / BAT）
@@ -161,14 +161,17 @@ Windows 使用方法（PowerShell / BAT）
 - 通过 BAT 文件启动（推荐）
 
 ```bat
- CreateWebProject.bat Demo
+.\scripts\<脚本名>.bat <项目名>
 ```
 
 - 直接在 PowerShell 中运行
 
 ```powershell
-.\CreateWebProject.ps1 -ProjectName Demo
+.\scripts\<脚本名>.ps1 -ProjectName <项目名>
 ```
+
+**注意** 目前无法确认项目运行的进程ID,暂时无法通过客户端执行项目的关闭 ❓
+
 
 ## 📦 依赖管理
 
