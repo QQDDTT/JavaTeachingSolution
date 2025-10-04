@@ -1,54 +1,123 @@
 package core;
 
-import java.io.*;
-import java.util.function.Consumer;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
- * TerminalExecutor 用于执行终端命令并返回实时输出
+ * TerminalExecutor
+ * 管理命令队列和输出队列，同时区分 stdout 和 stderr
  */
 public class TerminalExecutor {
 
-    private final String shell;
+    private final ConcurrentLinkedQueue<Map<String, String>> outputQueue = new ConcurrentLinkedQueue<>();
+    private volatile boolean running = false;
+    private final long commandTimeoutMillis = 30_000; // 超时30秒
+    /**
+     * 执行命令，并将 stdout 和 stderr 输出存入队列
+     */
+    public ResponseData startCommand(String command) {
+        if (running) {
+            return ResponseData.error("Command is running");
+        }
 
-    public TerminalExecutor() {
-        // 根据系统选择默认 shell
-        this.shell = System.getProperty("os.name").toLowerCase().contains("win") ? "cmd.exe" : "bash";
+        running = true;
+        outputQueue.clear();
+
+        new Thread(() -> {
+            try {
+                ProcessBuilder pb = new ProcessBuilder("bash", "-c", command);
+                Process process = pb.start();
+
+                // stdout
+                Thread stdoutThread = new Thread(() -> {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            Map<String, String> map = new HashMap<>();
+                            map.put("type", "out");
+                            map.put("text", line);
+                            outputQueue.offer(map);
+                        }
+                    } catch (Exception e) {
+                        Map<String, String> map = new HashMap<>();
+                        map.put("type", "err");
+                        map.put("text", "Read stdout faild: " + e.getMessage());
+                        outputQueue.offer(map);
+                    }
+                });
+
+                // stderr
+                Thread stderrThread = new Thread(() -> {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            Map<String, String> map = new HashMap<>();
+                            map.put("type", "err");
+                            map.put("text", line);
+                            outputQueue.offer(map);
+                        }
+                    } catch (Exception e) {
+                        Map<String, String> map = new HashMap<>();
+                        map.put("type", "err");
+                        map.put("text", "Read stderr faild: " + e.getMessage());
+                        outputQueue.offer(map);
+                    }
+                });
+
+                stdoutThread.start();
+                stderrThread.start();
+
+                // 等待进程结束或超时
+                boolean finished = process.waitFor(commandTimeoutMillis, TimeUnit.MILLISECONDS);
+                if (!finished) {
+                    process.destroyForcibly(); // 超时强制终止
+                    outputQueue.offer(Map.of("type", "err", "text", "Command timed out after " + (commandTimeoutMillis / 1000) + " seconds"));
+                }
+
+                stdoutThread.join();
+                stderrThread.join();
+
+            } catch (Exception e) {
+                Map<String, String> map = new HashMap<>();
+                map.put("type", "err");
+                map.put("text", "Run command faild: " + e.getMessage());
+                outputQueue.offer(map);
+                
+            } finally {
+                running = false;
+            }
+        }).start();
+
+        return ResponseData.success("Command started", Map.of("running", "1"));
     }
 
     /**
-     * 执行命令并通过回调逐行返回输出
-     * @param command 要执行的命令
-     * @param outputHandler 每行输出的处理逻辑（例如 Servlet 输出）
-     * @return 进程退出码
+     * 获取队列输出，返回 ResponseData
      */
-    public int execute(String command, Consumer<String> outputHandler) throws IOException, InterruptedException {
-        ProcessBuilder builder = new ProcessBuilder();
-        if (shell.equals("bash")) {
-            builder.command("bash", "-c", command);
-        } else {
-            builder.command("cmd.exe", "/c", command);
-        }
-        builder.redirectErrorStream(true); // stderr 合并到 stdout
+    public ResponseData pollOutput() {
+        Map<String, String> map = new HashMap<>();
+        StringBuilder outSb = new StringBuilder();
+        StringBuilder errSb = new StringBuilder();
 
-        Process process = builder.start();
-
-        // 逐行读取并交给调用者处理
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                outputHandler.accept(line);
+        Map<String, String> entry;
+        while ((entry = outputQueue.poll()) != null) {
+            String type = entry.get("type");
+            String text = entry.get("text");
+            if ("err".equals(type)) {
+                errSb.append(text).append("\n");
+            } else {
+                outSb.append(text).append("\n");
             }
         }
 
-        return process.waitFor();
-    }
+        map.put("out", outSb.toString());
+        map.put("err", errSb.toString());
+        map.put("running", running ? "1" : "0");
 
-    /**
-     * 执行命令并返回完整输出（适合非实时场景）
-     */
-    public String executeAndGetOutput(String command) throws IOException, InterruptedException {
-        StringBuilder output = new StringBuilder();
-        execute(command, line -> output.append(line).append(System.lineSeparator()));
-        return output.toString();
+        return ResponseData.success("Get output", map);
     }
 }

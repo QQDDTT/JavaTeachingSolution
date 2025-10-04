@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const tabs = document.querySelectorAll(".tab-btn");
-    const contents = document.querySelectorAll(".tab-content");
+    const consoleTab = document.getElementById("consoleTab");
+    const editorTab = document.getElementById("editorTab");
+    const consoleInput = document.getElementById("consoleInput");
     const consoleOutput = document.getElementById("consoleOutput");
     const sleepOverlay = document.getElementById("sleepOverlay");
     const projectSelect = document.getElementById("projectSelect");
@@ -23,40 +24,140 @@ document.addEventListener("DOMContentLoaded", () => {
     const maxFail = 5;
     let currentFilePath = "";
 
+    // --- 系统操作 ---
+    async function systemAction(action) {
+        if (!['restart', 'close'].includes(action)) {
+            viewStatus("Unknow action", "red");
+            return;
+        }
+
+        const res = await fetch(`/system?action=${encodeURIComponent(action)}`);
+
+        const data = await res.json().then(data => ({ ...data, status: res.status }));
+
+        if (data.status === 200) {
+            viewStatus(data.message, "orange");
+
+            // 再次确认执行
+            if (confirm(`Are you sure you want to ${action === 'restart' ? 'restart' : 'shut down'} the system now?`)) {
+                await fetch(`/system?action=${encodeURIComponent(action)}&code=${encodeURIComponent(data.code)}`, {
+                    method: 'POST',
+                    headers: { "Content-Type": "text/plain; charset=UTF-8" }
+                });
+
+                if (action === "close") {
+                    setTimeout(() => window.close(), 500);
+                }
+            }
+        } else {
+            viewStatus(data.message, "red");
+        }
+    }
+    document.getElementById("restartBtn").addEventListener("click", function() {systemAction("restart")});
+    document.getElementById("closeBtn").addEventListener("click", function() {systemAction("close")});
+    
+
     // --- 状态栏 ---
     function viewStatus(text, color = "white") {
         statusBar.style.color = color;
         statusBar.innerText = text;
     }
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            if (consoleTab.classList.contains("active"))
+                startCommand();
+        }
+    });
 
     // --- 选项卡 ---
-    tabs.forEach(tab => {
-        tab.addEventListener("click", () => {
-            // 设置激活样式
-            tabs.forEach(t => t.classList.remove("active"));
-            tab.classList.add("active");
-            // 切换内容
-            contents.forEach(c => c.classList.remove("active"));
-            const target = document.getElementById(tab.dataset.tab);
-            target.classList.add("active");
+    const tabs = [
+        { btn: document.getElementById("consoleBtn"), content: consoleTab },
+        { btn: document.getElementById("editorBtn"), content: editorTab }
+    ];
+
+    tabs.forEach(t => {
+        t.btn.addEventListener("click", () => {
+            tabs.forEach(x => {
+                x.btn.classList.remove("active");
+                x.content.classList.remove("active");
+            });
+            t.btn.classList.add("active");
+            t.content.classList.add("active");
         });
     });
 
+    function viewStatus(text, color = "white") {
+        statusBar.style.color = color;
+        statusBar.innerText = text;
+    }
+
+    viewStatus("Welcome", "green");
+
     // --- 控制台 ---
-    function appendConsole(text) {
-        const line = document.createElement("div");
-        line.textContent = text;
-        consoleOutput.appendChild(line);
+    function appendConsole(text, type = "out") {
+        const div = document.createElement("div");
+        div.textContent = text;
+        div.style.color = type === "err" ? "red" : "#0f0";
+        consoleOutput.appendChild(div);
         consoleOutput.scrollTop = consoleOutput.scrollHeight;
     }
 
     document.getElementById("sendConsoleBtn").addEventListener("click", () => {
-        const input = document.getElementById("consoleInput");
-        if(input.value.trim()) {
-            appendConsole("> " + input.value);
-            input.value = "";
-        }
+        startCommand();
     });
+
+    let polling = false;
+    let pollStartTime = 0;
+    const pollTimeout = 30000;
+
+    function startCommand() {
+        const cmd = consoleInput.value.trim();
+        if (!cmd) return;
+        appendConsole("> " + cmd);
+
+        fetch(`/terminal?action=start&cmd=${encodeURIComponent(cmd)}`)
+            .then(res => res.json())
+            .then(({ map }) => {
+                if (map.running === "1") {
+                    consoleInput.value = "";
+                    polling = true;
+                    pollStartTime = Date.now();
+                    pollOutput();
+                }
+            })
+            .catch(err => console.error("Start command failed:", err));
+    }
+
+
+    function pollOutput() {
+        if (!polling) return;
+        // 超时检查
+        if (Date.now() - pollStartTime > pollTimeout) {
+            viewStatus("Terminal command timed out", "red");
+            polling = false;
+            return;
+        }
+
+        fetch(`/terminal?action=poll`)
+            .then(res => res.json())
+            .then(({ map }) => {
+                if (map.out) map.out.split("\n").forEach(line => line && appendConsole(line, "out"));
+                if (map.err) map.err.split("\n").forEach(line => line && appendConsole(line, "err"));
+
+                if (map.running === "1") {
+                    viewStatus("Terminal is running...", "orange");
+                    setTimeout(pollOutput, 100); // 0.1 秒轮询
+                } else {
+                    viewStatus("Please input command", "green");
+                    polling = false;
+                }
+            })
+            .catch(err => {
+                // 遇到错误也停止轮询，避免无限报错
+                polling = false;
+                viewStatus("Poll failed", "red");
+            });
+    }
 
     // --- 编辑器按钮 ---
     document.getElementById("refreshBtn").addEventListener("click", () => readFile());
@@ -184,11 +285,6 @@ document.addEventListener("DOMContentLoaded", () => {
         editor.contentEditable = "true";
     }
 
-    document.getElementById("restartBtn").addEventListener("click", enterSleep);
-    document.getElementById("closeBtn").addEventListener("click", () => {
-        if(confirm("Confirm closing of this webpage?")) window.close();
-    });
-
     // --- 心跳机制 ---
     function sendHeartbeat() {
         fetch("/heartbeat")
@@ -209,8 +305,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // 初始化
-    exitSleep();
     refreshProjectList();
-    cleanEditor();
+    viewStatus("Welcome", "green");
+    exitSleep();
     setInterval(sendHeartbeat, 3000);
 });
