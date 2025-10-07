@@ -37,7 +37,7 @@ public class ProjectServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws IOException {
         String action = req.getParameter("action");
-        HttpSession session = req.getSession(true);
+        HttpSession session = req.getSession();
         String sessionId = session.getId();
         switch (action) {
             case "projects" -> ProjectManager.listModules().sendJson(resp);
@@ -48,16 +48,16 @@ public class ProjectServlet extends HttpServlet {
                     pm = new ProjectManager(project);
                     MANAGER_MAP.put(sessionId, pm);
                 }
-                pm.listProjectFiles(project).sendJson(resp);
+                pm.listProjectFiles().sendJson(resp);
             }
             case "read_file" -> {
-                String project = req.getParameter(sessionId);
+                String project = req.getParameter("project");
                 ProjectManager pm = MANAGER_MAP.get(sessionId);
-                if (pm == null) {
-                    ResponseData.error("Project does not match sessionID").sendJson(resp);
+                if (pm == null || pm.getProject().equals(project)) {
+                    ResponseData.error("Project [" + project + "] does not match sessionID").sendJson(resp);
                     return; 
                 }
-                pm.readFile(project, req.getParameter("path")).sendJson(resp);
+                pm.readFile(req.getParameter("path")).sendJson(resp);
             }
             default -> ResponseData.error("Unknown GET action: " + action).sendJson(resp);
         }
@@ -79,11 +79,11 @@ public class ProjectServlet extends HttpServlet {
             case "write_file" -> {
                 String project = req.getParameter("project");
                 ProjectManager pm = MANAGER_MAP.get(sessionId);
-                if (pm == null) {
+                if (pm == null || pm.getProject().equals(project)) {
                     ResponseData.error("Project does not match sessionID").sendJson(resp);
                     return;
                 }
-                pm.writeFile(project, req.getParameter("path"), req.getInputStream()).sendJson(resp);
+                pm.writeFile(req.getParameter("path"), req.getInputStream()).sendJson(resp);
             }
             default -> ResponseData.error("Unknown POST action: " + action).sendJson(resp);
         }

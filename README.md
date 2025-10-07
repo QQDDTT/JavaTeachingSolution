@@ -131,7 +131,7 @@ java -jar target/core-1.0-SNAPSHOT.jar
 
 core_web 模块是 Web 管理控制台，目标：
 - 统一展示所有已注册的子项目（控制台/Web）
-- 操作终端，用于执行子项目 （能够启动core，但暂时不能a交互）❓
+- 操作终端，用于执行子项目
 - 文本编辑器，修改子项目代码和资源文件（core和core_web未开放，暂时不具备编译功能）❓
 
 ```bash

@@ -134,10 +134,10 @@ document.addEventListener("DOMContentLoaded", () => {
     function executeCommand() {
         const cmd = consoleInput.value.trim();
         if (!cmd) return;
+        appendConsole(`~${current_path} > ${cmd}`);
         fetch(`/terminal?action=execute&cmd=${encodeURIComponent(cmd)}`)
             .then(res => res.json().then(data => ({ ...data, status: res.status })))
             .then(({ status, message, map }) => {
-                appendConsole(`~${current_path} > ${cmd}`);
                 if (status != 200) {
                     viewStatus(message, "red");
                     return;
@@ -194,7 +194,11 @@ document.addEventListener("DOMContentLoaded", () => {
         fetch("/project?action=projects")
             .then(res => res.json().then(data => ({ ...data, status: res.status })))
             .then(({ status, message, map }) => {
-                viewStatus(message, status == 200 ? "green" : "red");
+                if (status != 200) {
+                    viewStatus(message, "resd");
+                    return 
+                }
+                viewStatus(message, "green");
                 while (projectSelect.firstChild) projectSelect.removeChild(projectSelect.firstChild);
                 // 添加项目
                 Object.keys(map).forEach(item => {
@@ -222,7 +226,11 @@ document.addEventListener("DOMContentLoaded", () => {
         fetch(`/project?action=list&project=${projectName}`)
             .then(res => res.json().then(data => ({ ...data, status: res.status })))
             .then(({ status, message, map }) => {
-                viewStatus(message, status == 200 ? "green" : "red");
+                if (status != 200) {
+                    viewStatus(message, "red");
+                    return;
+                }
+                viewStatus(message, "green");
                 while (fileList.firstChild) fileList.removeChild(fileList.firstChild);
                 Object.entries(map).forEach(([key, value]) => {
                     if (value == "File") {
@@ -244,18 +252,21 @@ document.addEventListener("DOMContentLoaded", () => {
             })
             .catch (err => viewStatus(`Get files list failed :${err}`, "red"));
     }
+
     projectSelect.addEventListener("change", () => listProjectFiles());
 
-    function cleanEditor() {
-        editor.innerHTML = "";
-    }
+    function cleanEditor() { editor.innerHTML = ""; }
 
     function readFile() {
         const projectName = projectSelect.value;
         fetch(`/project?action=read_file&path=${currentFilePath}&project=${projectName}`)
             .then(res => res.json().then(data => ({ ...data, status: res.status })))
             .then(({ status, message, map }) => {
-                viewStatus(`${message}: ${map.file}`, status == 200 ? "green" : "red");
+                if (status != 200) {
+                    viewStatus(message, "red");
+                    return;    
+                }
+                viewStatus(`${message}: ${map.file}`, "green");
                 cleanEditor();
                 editor.value = map.content;
             })
@@ -274,7 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
         })
         .then(res => res.json().then(data => ({ ...data, status: res.status })))
         .then(({ status, message }) => {
-            viewStatus(message, status === 200 ? "green" : "red");
+            viewStatus(message, status == 200 ? "green" : "red");
         })
         .catch(err => viewStatus(`Write file failed: ${err}`, "red"));
     }

@@ -1,6 +1,7 @@
 package core;
 
 import java.io.*;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -27,7 +28,7 @@ public class TerminalExecutor {
 
     public TerminalExecutor() throws IOException {
         this.rootPath = new File("").getAbsolutePath();
-        this.currentPath = ".";
+        this.currentPath = rootPath;
 
         // 根据操作系统选择终端命令
         String os = System.getProperty("os.name").toLowerCase();
@@ -61,15 +62,48 @@ public class TerminalExecutor {
         emptyPollCount = 0; // 重置空轮询计数
 
         try {
-            terminalWriter.write(command);
-            terminalWriter.newLine();
-            terminalWriter.flush();
+            if (command.startsWith("cd ")) {
+                String target = command.trim().substring(3).trim();
+                String resolvedPath = resolvePath(currentPath, target);
+
+                // 检查是否在 rootPath 内
+                if (!isInsideRoot(rootPath, resolvedPath)) {
+                    outputQueue.offer(Map.of("type", "err", "text", "Access denied: " + resolvedPath));
+                    running = false;
+                    return ResponseData.success("Outside root path", Map.of("running", "0", "path", getSafeRelativePath()));
+                }
+
+                File dir = new File(resolvedPath);
+                if (!dir.isDirectory()) {
+                    outputQueue.offer(Map.of("type", "err", "text", "No such directory: " + target));
+                    running = false;
+                    return ResponseData.success("No such directory", Map.of("running", "0", "path", getSafeRelativePath()));
+                }
+
+                // ✅ 先更新当前路径
+                this.currentPath = dir.getCanonicalPath();
+
+                // ✅ 再让真实终端也执行 cd 命令
+                terminalWriter.write("cd \"" + this.currentPath + "\"");
+                terminalWriter.newLine();
+                terminalWriter.flush();
+            } else {
+                // 普通命令直接写入终端
+                terminalWriter.write(command);
+                terminalWriter.newLine();
+                terminalWriter.flush();
+            }
         } catch (IOException e) {
             outputQueue.offer(Map.of("type", "err", "text", "Failed to send command: " + e.getMessage()));
             running = false;
         }
 
-        return ResponseData.success("Command sent", Map.of("running", "1", "path", currentPath));
+        return ResponseData.success(
+            "Command sent", 
+                    Map.of(
+                        "running", "1", 
+                        "path", getSafeRelativePath())
+                );
     }
 
     /** 获取输出 */
@@ -102,7 +136,7 @@ public class TerminalExecutor {
         map.put("out", outSb.toString());
         map.put("err", errSb.toString());
         map.put("running", running ? "1" : "0");
-        map.put("path", currentPath);
+        map.put("path", getSafeRelativePath());
 
         return ResponseData.success("Get output", map);
     }
@@ -125,4 +159,46 @@ public class TerminalExecutor {
     public boolean isRunning() {
         return running;
     }
+
+    /** 解析目标路径（支持绝对、相对、~、..） */
+    private String resolvePath(String currentPath, String input) {
+        if (input.isEmpty() || input.equals("~")) {
+            return System.getProperty("user.home");
+        }
+        File target = new File(input);
+        if (target.isAbsolute()) return target.getAbsolutePath();
+        return Path.of(currentPath).resolve(input).normalize().toString();
+    }
+
+    /** 检查路径是否在 rootPath 下 */
+    private boolean isInsideRoot(String rootPath, String targetPath) {
+        try {
+            Path root = Path.of(rootPath).toRealPath().normalize();
+            Path target = Path.of(targetPath).normalize();
+            return target.startsWith(root);
+        } catch (IOException e) {
+            return false; // 不存在的路径直接判为非法
+        }
+    }
+
+    /** 获取当前路径（相对于 rootPath 的相对路径，Linux 风格） */
+    private String getSafeRelativePath() {
+        try {
+            Path root = Path.of(this.rootPath).toRealPath().normalize();
+            Path current = Path.of(this.currentPath).toRealPath().normalize();
+
+            if (!current.startsWith(root)) {
+                // 不在 rootPath 内则返回 "." 或绝对路径（安全策略）
+                return ".";
+            }
+
+            String relative = root.relativize(current).toString().replace("\\", "/");
+            return relative.isEmpty() ? "." : relative;
+
+        } catch (IOException | IllegalArgumentException e) {
+            // 出错时返回 "." 以防泄露绝对路径
+            return ".";
+        }
+    }
+
 }

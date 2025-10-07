@@ -13,29 +13,39 @@ import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
-
+/**
+ * 核心 Web 服务器启动器
+ */
 public class CoreWebServer {
+    /** 服务器端口号 */
+    private static final int PORT = 8080;
 
+    /** 最大允许用户连接数（示例） */
+    private static final int MAX_USER = 100;
+
+    /** 会话超时时间（分钟）*/
+    private static final int SESSION_TIMEOUT_MINUTES = 30;
+
+    /** 静态资源路径（相对于项目根目录） */
+    private static final String STATIC_RESOURCE_PATH = "/META-INF/resources";
     public static void main(String[] args) throws Exception {
-        int port = 8080;
-        int maxUsers = 1; // 同时允许的最大用户数
 
         QueuedThreadPool threadPool = new QueuedThreadPool(10, 1, 30000);
         Server server = new Server(threadPool);
 
         ServerConnector connector = new ServerConnector(server);
-        connector.setPort(port);
+        connector.setPort(PORT);
         server.addConnector(connector);
 
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
 
-        Resource base = Resource.newClassPathResource("/META-INF/resources");
+        Resource base = Resource.newClassPathResource(STATIC_RESOURCE_PATH);
         context.setBaseResource(base);
         context.setWelcomeFiles(new String[]{"home.html"});
 
         // 全局用户访问限制 Filter
-        addGlobalUserLimit(context, maxUsers);
+        addGlobalUserLimit(context);
 
         // 静态资源 Servlet
         ServletHolder staticHolder = new ServletHolder("default", org.eclipse.jetty.servlet.DefaultServlet.class);
@@ -59,23 +69,27 @@ public class CoreWebServer {
 
         server.setHandler(context);
         server.start();
-        System.out.println("Core Web Console running at http://localhost:" + port);
+        System.out.println("Core Web Console running at http://localhost:" + PORT);
         server.join();
     }
 
     /**
-     * 全局用户访问限制
-     *
+     * 全局用户访问限制（永久 Session 版本）
+     * <p>
+     * 使用 Semaphore 控制最大并发用户数。
+     * 每个用户首次访问时分配 Session，并且 Session 将永久有效（除非服务器关闭或手动销毁）。
+     * </p>
      * @param context ServletContextHandler
-     * @param maxUsers 最大同时访问用户数
      */
-    private static void addGlobalUserLimit(ServletContextHandler context, int maxUsers) {
-        // 信号量控制最大用户数
-        Semaphore userSemaphore = new Semaphore(maxUsers);
+    private static void addGlobalUserLimit(ServletContextHandler context) {
+        
+        // 并发访问许可（最大用户数）
+        Semaphore userSemaphore = new Semaphore(MAX_USER);
 
-        // Map 存储活跃 Session
+        // 活跃 Session 记录表
         ConcurrentHashMap<String, Boolean> activeUsers = new ConcurrentHashMap<>();
 
+        // 用户访问过滤器
         Filter userLimitFilter = new Filter() {
             @Override
             public void init(FilterConfig filterConfig) {}
@@ -86,31 +100,37 @@ public class CoreWebServer {
 
                 HttpServletRequest req = (HttpServletRequest) request;
                 HttpServletResponse resp = (HttpServletResponse) response;
+
+                // 获取或创建 Session
                 HttpSession session = req.getSession(true);
                 String sessionId = session.getId();
+
+                // 永久有效 Session（不自动过期）
+                session.setMaxInactiveInterval(-1);
 
                 boolean isNewUser = !activeUsers.containsKey(sessionId);
 
                 if (isNewUser) {
-                    // 尝试获取 Semaphore
+                    // 若为新用户则尝试获取访问许可
                     if (!userSemaphore.tryAcquire()) {
                         resp.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+                        resp.setContentType("text/plain;charset=UTF-8");
                         resp.getWriter().write("Server busy, maximum users reached.");
                         return;
                     }
+
+                    // 在 session 中保存用户信息
+                    session.setAttribute("connectedAt", System.currentTimeMillis());
+                    session.setAttribute("remoteAddr", req.getRemoteAddr());
                     activeUsers.put(sessionId, Boolean.TRUE);
+
+                    System.out.println("[SESSION] New user connected: " + sessionId + " from " + req.getRemoteAddr());
                 }
 
                 try {
                     chain.doFilter(request, response);
                 } finally {
-                    // 请求结束后检查 Session 是否无更多请求，如果是新用户且请求结束释放 Semaphore
-                    // 这里简单处理：每个请求结束释放一次 Semaphore，不考虑同一用户多个并发请求
-                    // 更精细实现可以统计每个 Session 内请求数
-                    if (isNewUser) {
-                        activeUsers.remove(sessionId);
-                        userSemaphore.release();
-                    }
+                    // 不在此处释放信号量，由 sessionDestroyed 控制
                 }
             }
 
@@ -118,6 +138,20 @@ public class CoreWebServer {
             public void destroy() {}
         };
 
+        // 注册过滤器
         context.addFilter(new FilterHolder(userLimitFilter), "/*", null);
+
+        // 注册 Session 监听器（用户断开或服务器关闭时释放许可）
+        context.getSessionHandler().addEventListener(new HttpSessionListener() {
+            @Override
+            public void sessionDestroyed(HttpSessionEvent se) {
+                String sessionId = se.getSession().getId();
+                if (activeUsers.remove(sessionId) != null) {
+                    userSemaphore.release();
+                    System.out.println("[SESSION] User disconnected: " + sessionId);
+                }
+            }
+        });
     }
+
 }

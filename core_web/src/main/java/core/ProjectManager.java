@@ -38,8 +38,6 @@ public class ProjectManager {
                 ));
     }
 
-
-
     /** 当前项目名 */
     private final String project;
 
@@ -55,23 +53,21 @@ public class ProjectManager {
     }
 
     // ========== 文件编辑功能 ==========
-
-    public ResponseData readFile(String project, String relativePath) {
+    public ResponseData readFile(String relativePath) {
         try {
-            Path filePath = Paths.get(PROJECTS.get(project), relativePath);
+            Path filePath = Paths.get(PROJECTS.get(this.project), relativePath);
             return ResponseData.success("Read file success", Map.of(
                                         "file", relativePath,
                                         "content", Files.readString(filePath)
                                         ));
         } catch (Exception e) {
-            return ResponseData.error(e.getMessage());
+            return ResponseData.error("[ProjectManager]" + e.getMessage());
         }
-
     }
 
-    public ResponseData writeFile(String project, String relativePath, ServletInputStream inputStream) {
+    public ResponseData writeFile(String relativePath, ServletInputStream inputStream) {
         try {
-            Path filePath = Paths.get(PROJECTS.get(project), relativePath);
+            Path filePath = Paths.get(PROJECTS.get(this.project), relativePath);
             Files.createDirectories(filePath.getParent());
 
             // 使用 try-with-resources 自动关闭流
@@ -89,9 +85,9 @@ public class ProjectManager {
 
 
     // ========== 文件管理功能 ==========
-    public ResponseData createFile(String project, String relativePath) {
+    public ResponseData createFile(String relativePath) {
         try {
-            Path filePath = Paths.get(PROJECTS.get(project), relativePath);
+            Path filePath = Paths.get(PROJECTS.get(this.project), relativePath);
 
             // 确保父目录存在
             Files.createDirectories(filePath.getParent());
@@ -115,9 +111,9 @@ public class ProjectManager {
     }
 
     
-    public ResponseData createDirectory(String project, String relativePath) {
+    public ResponseData createDirectory(String relativePath) {
         try {
-            Path dirPath = Paths.get(PROJECTS.get(project), relativePath);
+            Path dirPath = Paths.get(PROJECTS.get(this.project), relativePath);
 
             // 如果目录已存在
             if (Files.exists(dirPath)) {
@@ -139,9 +135,9 @@ public class ProjectManager {
         }
     }
 
-    public ResponseData deletePath(String project, String relativePath) {
+    public ResponseData deletePath(String relativePath) {
         try {
-            Path path = Paths.get(PROJECTS.get(project), relativePath);
+            Path path = Paths.get(PROJECTS.get(this.project), relativePath);
 
             if (!Files.exists(path)) {
                 return ResponseData.error("Path not found: " + relativePath);
@@ -187,9 +183,9 @@ public class ProjectManager {
     /**
      * 获取子项目文件树（不含 target 和 pom.xml）
      */
-    public ResponseData listProjectFiles(String project) {
+    public ResponseData listProjectFiles() {
         try {
-            Path root = Paths.get(PROJECTS.get(project));
+            Path root = Paths.get(PROJECTS.get(this.project));
             try (Stream<Path> stream = Files.walk(root)) {
                 return ResponseData.success("List file success", stream
                         .filter(path -> !path.toString().contains("target"))  
