@@ -24,7 +24,7 @@ public class CoreWebServer {
     private static final int MAX_USER = 100;
 
     /** 会话超时时间（分钟）*/
-    private static final int SESSION_TIMEOUT = 30 * 60;
+    private static final int SESSION_TIMEOUT = -1;
 
     /** 静态资源路径（相对于项目根目录） */
     private static final String STATIC_RESOURCE_PATH = "/META-INF/resources";
@@ -106,7 +106,7 @@ public class CoreWebServer {
                 String sessionId = session.getId();
 
                 // 永久有效 Session（不自动过期）
-                session.setMaxInactiveInterval(-1);
+                session.setMaxInactiveInterval(SESSION_TIMEOUT);
 
                 boolean isNewUser = !activeUsers.containsKey(sessionId);
 
