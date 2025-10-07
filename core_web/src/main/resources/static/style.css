@@ -77,6 +77,46 @@ html, body {
 }
 
 /* 控制台 */
+/* 控制台工具栏 */
+#consoleToolbar {
+    display: flex;
+    align-items: center;
+    padding: 5px 10px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #333;
+    gap: 8px;
+}
+
+.icon-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background 0.2s, transform 0.1s;
+}
+
+/* 按钮风格 */
+.icon-btn.start {
+    background: #28a745;
+}
+.icon-btn.stop {
+    background: #dc3545;
+}
+
+/* 悬停与点击反馈 */
+.icon-btn:hover {
+    filter: brightness(1.2);
+}
+.icon-btn:active {
+    transform: scale(0.95);
+}
+
 #consoleOutput {
     flex: 1;
     padding: 10px;

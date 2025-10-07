@@ -24,24 +24,41 @@ import jakarta.servlet.ServletInputStream;
 public class ProjectManager {
 
     private static final File PARENT_DIR = new File(".");
-    private final Map<String, String> projects;
+    public static final Map<String, String> PROJECTS;
 
-    public ProjectManager() {
-        this.projects = Arrays.stream(PARENT_DIR.listFiles())
-                            .filter(File::isDirectory)
-                            .filter(dir -> dir.getName().startsWith("web_") || dir.getName().startsWith("console_"))
-                            .collect(Collectors.toMap(
-                                File::getName, 
-                                File::getAbsolutePath,
-                                (existing, replacement) -> existing,    
-                                ConcurrentHashMap::new
-                            ));
+    static {
+        PROJECTS = Arrays.stream(PARENT_DIR.listFiles())
+                .filter(File::isDirectory)
+                .filter(dir -> dir.getName().startsWith("web_") || dir.getName().startsWith("console_"))
+                .collect(Collectors.toMap(
+                        File::getName,
+                        File::getAbsolutePath,
+                        (existing, replacement) -> existing,
+                        ConcurrentHashMap::new
+                ));
     }
+
+
+
+    /** 当前项目名 */
+    private final String project;
+
+    public ProjectManager(String project) {
+        if (!PROJECTS.containsKey(project)) {
+            throw new IllegalArgumentException("Unknown project: " + project);
+        }
+        this.project = project;
+    }
+
+    public String getProject() {
+        return this.project;
+    }
+
     // ========== 文件编辑功能 ==========
 
     public ResponseData readFile(String project, String relativePath) {
         try {
-            Path filePath = Paths.get(this.projects.get(project), relativePath);
+            Path filePath = Paths.get(PROJECTS.get(project), relativePath);
             return ResponseData.success("Read file success", Map.of(
                                         "file", relativePath,
                                         "content", Files.readString(filePath)
@@ -54,7 +71,7 @@ public class ProjectManager {
 
     public ResponseData writeFile(String project, String relativePath, ServletInputStream inputStream) {
         try {
-            Path filePath = Paths.get(this.projects.get(project), relativePath);
+            Path filePath = Paths.get(PROJECTS.get(project), relativePath);
             Files.createDirectories(filePath.getParent());
 
             // 使用 try-with-resources 自动关闭流
@@ -74,7 +91,7 @@ public class ProjectManager {
     // ========== 文件管理功能 ==========
     public ResponseData createFile(String project, String relativePath) {
         try {
-            Path filePath = Paths.get(this.projects.get(project), relativePath);
+            Path filePath = Paths.get(PROJECTS.get(project), relativePath);
 
             // 确保父目录存在
             Files.createDirectories(filePath.getParent());
@@ -100,7 +117,7 @@ public class ProjectManager {
     
     public ResponseData createDirectory(String project, String relativePath) {
         try {
-            Path dirPath = Paths.get(this.projects.get(project), relativePath);
+            Path dirPath = Paths.get(PROJECTS.get(project), relativePath);
 
             // 如果目录已存在
             if (Files.exists(dirPath)) {
@@ -124,7 +141,7 @@ public class ProjectManager {
 
     public ResponseData deletePath(String project, String relativePath) {
         try {
-            Path path = Paths.get(this.projects.get(project), relativePath);
+            Path path = Paths.get(PROJECTS.get(project), relativePath);
 
             if (!Files.exists(path)) {
                 return ResponseData.error("Path not found: " + relativePath);
@@ -163,8 +180,8 @@ public class ProjectManager {
     /**
      * 获取子项目列表
      */
-    public ResponseData listModules() {
-        return ResponseData.success("Sub projects", this.projects);
+    public static ResponseData listModules() {
+        return ResponseData.success("Sub projects", PROJECTS);
     }
 
     /**
@@ -172,7 +189,7 @@ public class ProjectManager {
      */
     public ResponseData listProjectFiles(String project) {
         try {
-            Path root = Paths.get(this.projects.get(project));
+            Path root = Paths.get(PROJECTS.get(project));
             try (Stream<Path> stream = Files.walk(root)) {
                 return ResponseData.success("List file success", stream
                         .filter(path -> !path.toString().contains("target"))  

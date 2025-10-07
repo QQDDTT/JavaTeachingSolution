@@ -65,7 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
             if (consoleTab.classList.contains("active"))
-                startCommand();
+                executeCommand();
         }
     });
 
@@ -94,6 +94,11 @@ document.addEventListener("DOMContentLoaded", () => {
     viewStatus("Welcome", "green");
 
     // --- 控制台 ---
+    document.getElementById("startTerminalBtn").addEventListener("click", startExecutor);
+    document.getElementById("closeTerminalBtn").addEventListener("click", closeExecutor);
+
+    let current_path = ".";
+
     function appendConsole(text, type = "out") {
         const div = document.createElement("div");
         div.textContent = text;
@@ -103,53 +108,74 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     document.getElementById("sendConsoleBtn").addEventListener("click", () => {
-        startCommand();
+        executeCommand();
     });
 
     let polling = false;
-    let pollStartTime = 0;
-    const pollTimeout = 30000;
 
-    function startCommand() {
+    function startExecutor() {
+        fetch(`/terminal?action=start`)
+            .then(res => res.json().then(data => ({ ...data, status: res.status })))
+            .then(({ status, message, map }) => {
+                viewStatus(message, status == 200 ? "green" : "red");
+            })
+            .catch(err => viewStatus(`Start executor failed : ${err}`));
+    }
+
+    function closeExecutor() {
+        fetch(`/terminal?action=close`)
+            .then(res => res.json().then(data => ({ ...data, status: res.status })))
+            .then(({ status, message, map}) => {
+                viewStatus(message, status == 200 ? "green" : "red");
+            })
+            .catch(err => viewStatus(`Close executor failed : ${err}`));
+    }
+
+    function executeCommand() {
         const cmd = consoleInput.value.trim();
         if (!cmd) return;
-        appendConsole("> " + cmd);
-
-        fetch(`/terminal?action=start&cmd=${encodeURIComponent(cmd)}`)
-            .then(res => res.json())
-            .then(({ map }) => {
-                if (map.running === "1") {
-                    consoleInput.value = "";
+        fetch(`/terminal?action=execute&cmd=${encodeURIComponent(cmd)}`)
+            .then(res => res.json().then(data => ({ ...data, status: res.status })))
+            .then(({ status, message, map }) => {
+                appendConsole(`~${current_path} > ${cmd}`);
+                if (status != 200) {
+                    viewStatus(message, "red");
+                    return;
+                }
+                viewStatus(message, "green");
+                consoleInput.value = "";
+                if (map.path) {
+                    current_path = map.path;
+                }
+                if (map.running == 1) {
                     polling = true;
-                    pollStartTime = Date.now();
                     pollOutput();
                 }
             })
-            .catch(err => console.error("Start command failed:", err));
+            .catch(err => `Execute command failed : ${err}`);
     }
 
 
     function pollOutput() {
         if (!polling) return;
-        // 超时检查
-        if (Date.now() - pollStartTime > pollTimeout) {
-            viewStatus("Terminal command timed out", "red");
-            polling = false;
-            return;
-        }
 
         fetch(`/terminal?action=poll`)
-            .then(res => res.json())
-            .then(({ map }) => {
-                if (map.out) map.out.split("\n").forEach(line => line && appendConsole(line, "out"));
-                if (map.err) map.err.split("\n").forEach(line => line && appendConsole(line, "err"));
+            .then(res => res.json().then(data => ({ ...data, status: res.status })))
+            .then(({ status, message, map }) => {
+                if (status === 200) {
+                    if (map.path) current_path = map.path;
+                    if (map.out) map.out.split("\n").forEach(line => line && appendConsole(line, "out"));
+                    if (map.err) map.err.split("\n").forEach(line => line && appendConsole(line, "err"));
 
-                if (map.running === "1") {
-                    viewStatus("Terminal is running...", "orange");
-                    setTimeout(pollOutput, 100); // 0.1 秒轮询
+                    if (map.running === "1") {
+                        viewStatus("Terminal is running...", "orange");
+                        setTimeout(pollOutput, 100); // 0.1 秒轮询
+                    } else {
+                        viewStatus("Terminal is waiting...", "green");
+                        polling = false;
+                    }
                 } else {
-                    viewStatus("Please input command", "green");
-                    polling = false;
+                    viewStatus(message, "red");
                 }
             })
             .catch(err => {

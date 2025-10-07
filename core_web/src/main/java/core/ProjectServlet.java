@@ -4,6 +4,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.*;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * ProjectServlet
@@ -13,16 +15,16 @@ import java.io.IOException;
  */
 public class ProjectServlet extends HttpServlet {
 
-    private ProjectManager projectManager;
-    // -------------------------------
-    // 模拟项目存储（线程安全）
-    // -------------------------------
+    /** 每个 session 的独立 ProjectManager */
+    private static final Map<String, ProjectManager> MANAGER_MAP = new ConcurrentHashMap<>();
+    
+    
     @Override
     public void init() throws ServletException {
         super.init();
-        this.projectManager = new ProjectManager();
-        log("[INIT] ProjectServlet initialized with default projects");
+        log("[INIT] ProjectServlet initialized");
     }
+
 
     /**
      * 处理 GET 请求
@@ -35,11 +37,28 @@ public class ProjectServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws IOException {
         String action = req.getParameter("action");
-
+        HttpSession session = req.getSession(true);
+        String sessionId = session.getId();
         switch (action) {
-            case "projects" -> projectManager.listModules().sendJson(resp);
-            case "list" -> projectManager.listProjectFiles(req.getParameter("project")).sendJson(resp);
-            case "read_file" -> projectManager.readFile(req.getParameter("project"), req.getParameter("path")).sendJson(resp);
+            case "projects" -> ProjectManager.listModules().sendJson(resp);
+            case "list" -> {
+                String project = req.getParameter("project");
+                ProjectManager pm = MANAGER_MAP.get(sessionId);
+                if (pm == null) {
+                    pm = new ProjectManager(project);
+                    MANAGER_MAP.put(sessionId, pm);
+                }
+                pm.listProjectFiles(project).sendJson(resp);
+            }
+            case "read_file" -> {
+                String project = req.getParameter(sessionId);
+                ProjectManager pm = MANAGER_MAP.get(sessionId);
+                if (pm == null) {
+                    ResponseData.error("Project does not match sessionID").sendJson(resp);
+                    return; 
+                }
+                pm.readFile(project, req.getParameter("path")).sendJson(resp);
+            }
             default -> ResponseData.error("Unknown GET action: " + action).sendJson(resp);
         }
     }
@@ -54,8 +73,18 @@ public class ProjectServlet extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws IOException {
         String action = req.getParameter("action");
+        HttpSession session = req.getSession(true);
+        String sessionId = session.getId();
         switch (action) {
-            case "write_file" -> projectManager.writeFile(req.getParameter("project"), req.getParameter("path"), req.getInputStream()).sendJson(resp);
+            case "write_file" -> {
+                String project = req.getParameter("project");
+                ProjectManager pm = MANAGER_MAP.get(sessionId);
+                if (pm == null) {
+                    ResponseData.error("Project does not match sessionID").sendJson(resp);
+                    return;
+                }
+                pm.writeFile(project, req.getParameter("path"), req.getInputStream()).sendJson(resp);
+            }
             default -> ResponseData.error("Unknown POST action: " + action).sendJson(resp);
         }
     }
