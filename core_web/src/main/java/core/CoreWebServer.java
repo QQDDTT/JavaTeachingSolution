@@ -24,7 +24,7 @@ public class CoreWebServer {
     private static final int MAX_USER = 100;
 
     /** 会话超时时间（分钟）*/
-    private static final int SESSION_TIMEOUT_MINUTES = 30;
+    private static final int SESSION_TIMEOUT = 30 * 60;
 
     /** 静态资源路径（相对于项目根目录） */
     private static final String STATIC_RESOURCE_PATH = "/META-INF/resources";
