@@ -62,24 +62,6 @@ public class Game2048 {
         return 4;
     }
 
-    // ================== 工具函数：获取某方向上的相邻格位置 ==================
-    private int getLeftPosition(int index) {
-        if (index % colCount == 0) throw new RuntimeException();
-        return index - 1;
-    }
-    private int getRightPosition(int index) {
-        if (index % colCount == colCount - 1) throw new RuntimeException();
-        return index + 1;
-    }
-    private int getUpPosition(int index) {
-        if (index < colCount) throw new RuntimeException();
-        return index - colCount;
-    }
-    private int getDownPosition(int index) {
-        if (index >= (rowCount - 1) * colCount) throw new RuntimeException();
-        return index + colCount;
-    }
-
     /**
      * 执行移动后，生成新数字并检测游戏状态
      */
