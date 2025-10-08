@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import common.utils.ResponseData;
+
 public class TerminalServlet extends HttpServlet {
 
     // sessionID -> TerminalExecutor 映射表（线程安全）

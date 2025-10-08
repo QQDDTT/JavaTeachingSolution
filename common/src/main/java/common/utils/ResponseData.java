@@ -1,4 +1,4 @@
-package core;
+package common.utils;
 
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;

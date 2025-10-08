@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
 
+import common.utils.ResponseData;
+
 /**
  * 系统控制 Servlet
  * 用于执行 restart / close 动作

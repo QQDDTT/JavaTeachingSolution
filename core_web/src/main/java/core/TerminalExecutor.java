@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import common.utils.ResponseData;
+
 /**
  * TerminalExecutor
  * 所有命令都在独立终端中执行，startCommand + pollOutput 与终端通信

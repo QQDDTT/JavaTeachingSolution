@@ -1,10 +1,295 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Home - web_gobang</title>
+<meta charset="UTF-8">
+<title>Gomoku Online</title>
+<style>
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f4e1b3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  user-select: none;
+}
+header {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 20px;
+}
+#session {
+  font-weight: bold;
+  color: #333;
+}
+#controls {
+  margin-top: 10px;
+}
+select, button {
+  margin: 5px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+#players {
+  display: flex;
+  justify-content: space-between;
+  width: 600px;
+  margin-bottom: 10px;
+}
+#players div {
+  text-align: center;
+  width: 200px;
+  font-size: 14px;
+}
+
+/* 传统棋盘风格 */
+#board {
+  position: relative;
+  width: 480px;
+  height: 480px;
+  background: #d8b36e; /* 木色背景 */
+  border: 6px solid #654321;
+  box-shadow: 0 0 8px rgba(0,0,0,0.5);
+}
+
+/* 绘制格线 */
+#board::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(0,0,0,0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.5) 1px, transparent 1px);
+  background-size: calc(480px / 15) calc(480px / 15);
+  pointer-events: none;
+}
+
+/* 棋子样式 */
+.cell {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+.cell.black {
+  background: radial-gradient(circle at 35% 35%, #333, #000);
+  box-shadow: inset -2px -2px 4px rgba(255,255,255,0.3);
+}
+.cell.white {
+  background: radial-gradient(circle at 35% 35%, #fff, #ccc);
+  box-shadow: inset -2px -2px 4px rgba(0,0,0,0.3);
+}
+.cell.gray {
+  background: transparent;
+  cursor: not-allowed;
+}
+
+/* 星位点 */
+.star {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #000;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+#status {
+  margin-top: 10px;
+  font-size: 16px;
+  font-weight: bold;
+}
+</style>
 </head>
 <body>
-    <h1>Welcome to web_gobang!</h1>
+
+<header>
+  <div>Session ID: <span id="session">...</span></div>
+  <div id="controls">
+    <button onclick="createRoom()">Create Room</button>
+    <select id="roomList" onchange="selectRoom()">
+      <option value="">-- Select Room --</option>
+    </select>
+    <button onclick="refreshRooms()">Refresh</button>
+    <button onclick="joinRoom('B')">Join as Black</button>
+    <button onclick="joinRoom('W')">Join as White</button>
+    <button onclick="getRoomData()">Get Data</button>
+  </div>
+</header>
+
+<div id="players">
+  <div>
+    <div>Black</div>
+    <div id="blackId">---</div>
+  </div>
+  <div>
+    <div>White</div>
+    <div id="whiteId">---</div>
+  </div>
+</div>
+
+<div id="board"></div>
+
+<div id="status">Waiting...</div>
+
+<script>
+const boardElem = document.getElementById('board');
+const sessionElem = document.getElementById('session');
+const statusElem = document.getElementById('status');
+const blackElem = document.getElementById('blackId');
+const whiteElem = document.getElementById('whiteId');
+const roomSelect = document.getElementById('roomList');
+let sessionId = "";
+let selectedRoom = "";
+let stones = [];
+let gameActive = false;
+let myColor = null;
+
+const CELL_SIZE = 480 / 15;
+
+// 初始化棋盘（不再用grid，而是定位棋子）
+function initBoard() {
+  // 绘制星位点（传统布局）
+  const stars = [
+    [3,3], [3,11],
+    [7,7],
+    [11,3], [11,11]
+  ];
+  for (const [x, y] of stars) {
+    const s = document.createElement("div");
+    s.className = "star";
+    s.style.left = `${(x + 0.5) * CELL_SIZE}px`;
+    s.style.top = `${(y + 0.5) * CELL_SIZE}px`;
+    boardElem.appendChild(s);
+  }
+
+  // 创建棋位
+  for (let i = 0; i < 15 * 15; i++) {
+    const cell = document.createElement("div");
+    cell.className = "cell gray";
+    const x = i % 15;
+    const y = Math.floor(i / 15);
+    cell.style.left = `${(x + 0.5) * CELL_SIZE}px`;
+    cell.style.top = `${(y + 0.5) * CELL_SIZE}px`;
+    cell.dataset.index = i;
+    cell.onclick = () => placeStone(i);
+    boardElem.appendChild(cell);
+    stones.push(cell);
+  }
+}
+
+window.onload = async () => {
+  initBoard();
+  sessionId = await fetchSessionId();
+  sessionElem.textContent = sessionId;
+  refreshRooms();
+};
+
+// 获取 Session ID（通过访问服务器建立 session）
+async function fetchSessionId() {
+  const res = await fetch('/game?action=list');
+  const cookie = document.cookie.match(/JSESSIONID=([^;]+)/);
+  return cookie ? cookie[1] : "(none)";
+}
+
+// 刷新房间列表
+async function refreshRooms() {
+  const res = await fetch('/game?action=list');
+  const data = await res.json();
+  console.log("data:", data);
+  roomSelect.innerHTML = '<option value="">-- Select Room --</option>';
+  const map = data.map || (data.data && data.data.map) || {};
+  for (const [id, roomJson] of Object.entries(map)) {
+    const option = document.createElement('option');
+    option.value = id;
+    option.textContent = id;
+    roomSelect.appendChild(option);
+  }
+}
+
+// 创建房间
+async function createRoom() {
+  const res = await fetch('/game?action=create');
+  const data = await res.json();
+  alert(data.message);
+  refreshRooms();
+}
+
+// 选择房间
+function selectRoom() {
+  selectedRoom = roomSelect.value;
+  if (!selectedRoom) {
+    statusElem.textContent = "No room selected.";
+    return;
+  }
+  getRoomData();
+}
+
+// 加入房间
+async function joinRoom(color) {
+  if (!selectedRoom) return alert("Select a room first!");
+  const res = await fetch(`/game?action=join&id=${selectedRoom}&color=${color}`);
+  const data = await res.json();
+  alert(data.message);
+  myColor = color;
+  getRoomData();
+}
+
+// 获取房间和棋盘数据
+async function getRoomData() {
+  if (!selectedRoom) return alert("Select a room first!");
+  const res = await fetch(`/game?action=data&id=${selectedRoom}`);
+  const data = await res.json();
+  if (data.status !== "success") {
+    statusElem.textContent = data.message;
+    return;
+  }
+  const parsed = JSON.parse(data.data.game);
+  renderBoard(parsed.board);
+  statusElem.textContent = parsed.status;
+  const room = JSON.parse(data.data.room);
+  blackElem.textContent = room.black || "---";
+  whiteElem.textContent = room.white || "---";
+  gameActive = parsed.status !== "Game over";
+}
+
+// 落子
+async function placeStone(index) {
+  if (!gameActive) return;
+  if (!myColor) return alert("Join as a player first!");
+  const res = await fetch(`/game`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      action: 'next',
+      id: selectedRoom,
+      color: myColor,
+      index: index
+    })
+  });
+  const data = await res.json();
+  if (data.status === "success") {
+    getRoomData();
+  } else {
+    alert(data.message);
+  }
+}
+
+// 渲染棋盘
+function renderBoard(boardStr) {
+  for (let i = 0; i < 15 * 15; i++) {
+    const c = boardStr[i];
+    const cell = stones[i];
+    cell.className = "cell";
+    if (c === "B") cell.classList.add("black");
+    else if (c === "W") cell.classList.add("white");
+    else if (gameActive) cell.classList.add("empty");
+    else cell.classList.add("gray");
+  }
+}
+</script>
+
 </body>
 </html>
