@@ -189,32 +189,46 @@ window.onload = async () => {
 
 // 获取 Session ID（通过访问服务器建立 session）
 async function fetchSessionId() {
-  const res = await fetch('/game?action=list');
-  const cookie = document.cookie.match(/JSESSIONID=([^;]+)/);
-  return cookie ? cookie[1] : "(none)";
+  return fetch('/game?action=list')
+    .then(res => res.text()) // 只是触发 session 创建
+    .then(() => {
+      const cookie = document.cookie.match(/JSESSIONID=([^;]+)/);
+      return cookie ? cookie[1] : "(none)";
+    })
+    .catch(err => {
+      console.error("Failed to fetch session:", err);
+      return "(error)";
+    });
 }
 
 // 刷新房间列表
-async function refreshRooms() {
-  const res = await fetch('/game?action=list');
-  const data = await res.json();
-  console.log("data:", data);
-  roomSelect.innerHTML = '<option value="">-- Select Room --</option>';
-  const map = data.map || (data.data && data.data.map) || {};
-  for (const [id, roomJson] of Object.entries(map)) {
-    const option = document.createElement('option');
-    option.value = id;
-    option.textContent = id;
-    roomSelect.appendChild(option);
-  }
+function refreshRooms() {
+  return fetch('/game?action=list')
+    .then(res => res.json())
+    .then(data => {
+      console.log("data:", data);
+      roomSelect.innerHTML = '<option value="">-- Select Room --</option>';
+      const map = data.map || (data.data && data.data.map) || {};
+      for (const [id, roomJson] of Object.entries(map)) {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = id;
+        roomSelect.appendChild(option);
+      }
+    })
+    .catch(err => console.error("Failed to refresh rooms:", err));
 }
 
 // 创建房间
-async function createRoom() {
-  const res = await fetch('/game?action=create');
-  const data = await res.json();
-  alert(data.message);
-  refreshRooms();
+function createRoom() {
+  fetch('/game?action=create')
+    .then(res => res.json())
+    .then(data => {
+      alert(data.message);
+      console.log("data:", data);
+      refreshRooms();
+    })
+    .catch(err => console.error("Create room failed:", err));
 }
 
 // 选择房间
@@ -228,38 +242,47 @@ function selectRoom() {
 }
 
 // 加入房间
-async function joinRoom(color) {
+function joinRoom(color) {
   if (!selectedRoom) return alert("Select a room first!");
-  const res = await fetch(`/game?action=join&id=${selectedRoom}&color=${color}`);
-  const data = await res.json();
-  alert(data.message);
-  myColor = color;
-  getRoomData();
+  fetch(`/game?action=join&id=${selectedRoom}&color=${color}`)
+    .then(res => res.json())
+    .then(data => {
+      alert(data.message);
+      if (data.status == 200) {
+        myColor = color;
+        getRoomData();
+      }
+    })
+    .catch(err => console.error("Join room failed:", err));
 }
 
 // 获取房间和棋盘数据
-async function getRoomData() {
+function getRoomData() {
   if (!selectedRoom) return alert("Select a room first!");
-  const res = await fetch(`/game?action=data&id=${selectedRoom}`);
-  const data = await res.json();
-  if (data.status !== "success") {
-    statusElem.textContent = data.message;
-    return;
-  }
-  const parsed = JSON.parse(data.data.game);
-  renderBoard(parsed.board);
-  statusElem.textContent = parsed.status;
-  const room = JSON.parse(data.data.room);
-  blackElem.textContent = room.black || "---";
-  whiteElem.textContent = room.white || "---";
-  gameActive = parsed.status !== "Game over";
+  fetch(`/game?action=data&id=${selectedRoom}`)
+    .then(res => {
+      if (!res.ok) {  // 判断 HTTP status
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      return res.json();
+    })
+    .then(data => {
+      parsed = JSON.parse(data.data.game);
+      renderBoard(parsed.board);
+      statusElem.textContent = parsed.status;
+      const room = JSON.parse(data.data.room);
+      blackElem.textContent = room.black || "---";
+      whiteElem.textContent = room.white || "---";
+      gameActive = parsed.status !== "Game over";
+    })
+    .catch(err => console.error("Get room data failed:", err));
 }
 
 // 落子
-async function placeStone(index) {
+function placeStone(index) {
   if (!gameActive) return;
   if (!myColor) return alert("Join as a player first!");
-  const res = await fetch(`/game`, {
+  fetch(`/game`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -268,13 +291,16 @@ async function placeStone(index) {
       color: myColor,
       index: index
     })
-  });
-  const data = await res.json();
-  if (data.status === "success") {
-    getRoomData();
-  } else {
-    alert(data.message);
-  }
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "success") {
+        getRoomData();
+      } else {
+        alert(data.message);
+      }
+    })
+    .catch(err => console.error("Place stone failed:", err));
 }
 
 // 渲染棋盘

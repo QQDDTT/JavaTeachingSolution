@@ -24,7 +24,7 @@ public class GameServlet extends HttpServlet {
         String sessionId = req.getSession().getId();
         switch (action) {
             case "list" -> {
-                Map<String, String> map = GAME_MAP.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toJson()));
+                Map<String, String> map = GAME_MAP.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getId()));
                 ResponseData.success("list", map).sendJson(resp);
             }
             case "create" -> {
@@ -33,7 +33,7 @@ public class GameServlet extends HttpServlet {
                     Room room = new Room();
                     String newId = room.getId();
                     GAME_MAP.put(newId, room);
-                    ResponseData.success("Create success", Map.of("room", room.toJson())).sendJson(resp);
+                    ResponseData.success("Create success", Map.of("room", room.getId())).sendJson(resp);
                     return;
                 } else {
                     if (GAME_MAP.keySet().contains(gameId)) {
@@ -49,7 +49,7 @@ public class GameServlet extends HttpServlet {
                     ResponseData.error("Game is not exist").sendJson(resp);
                     return;
                 }
-                if (color == null || !color.equals(GameGobang.WHITE) || !color.equals(GameGobang.BLACK)) {
+                if (color == null || color.charAt(0) != GameGobang.WHITE || color.charAt(0) != GameGobang.BLACK) {
                     ResponseData.error("Color is error").sendJson(resp);
                     return;
                 }
@@ -58,7 +58,7 @@ public class GameServlet extends HttpServlet {
             case "data" -> {
                 String gameId = req.getParameter("id");
                 if (gameId == null || !GAME_MAP.keySet().contains(gameId)) {
-                    ResponseData.error("Game is not exist");
+                    ResponseData.error("Game is not exist").sendJson(resp);;
                     return;
                 }
                 GAME_MAP.get(gameId).getData().sendJson(resp);
@@ -81,7 +81,7 @@ public class GameServlet extends HttpServlet {
                     ResponseData.error("Game is not exist").sendJson(resp);
                     return;
                 }
-                if (color == null || !color.equals(GameGobang.WHITE) || !color.equals(GameGobang.BLACK)) {
+                if (color == null || color.length() > 1 || (color.charAt(0) != GameGobang.WHITE && color.charAt(0) != GameGobang.BLACK)) {
                     ResponseData.error("Color is error").sendJson(resp);
                     return;
                 }
@@ -94,7 +94,7 @@ public class GameServlet extends HttpServlet {
                     ResponseData.error("Game is not exist").sendJson(resp);
                     return;
                 }
-                if (color == null || !color.equals(GameGobang.WHITE) || !color.equals(GameGobang.BLACK)) {
+                if (color == null || color.length() > 1 || (color.charAt(0) != GameGobang.WHITE && color.charAt(0) != GameGobang.BLACK)) {
                     ResponseData.error("Color is error").sendJson(resp);
                     return;
                 }
@@ -143,12 +143,12 @@ public class GameServlet extends HttpServlet {
         }
 
         public ResponseData join(String sessionId, String color) {
-            if (color.equals(GameGobang.BLACK) && (this.blackSession == null || this.blackSession.isEmpty())) {
+            if (color.charAt(0) == GameGobang.BLACK && (this.blackSession == null || this.blackSession.isEmpty())) {
                 this.blackSession = sessionId;
-                return ResponseData.success("Join success", Map.of("room", this.toJson()));
-            } else if (color.equals(GameGobang.WHITE) && (this.whiteSession == null || this.whiteSession.isEmpty())) {
+                return ResponseData.success("Join success", Map.of("room", this.id));
+            } else if (color.charAt(0) == GameGobang.WHITE && (this.whiteSession == null || this.whiteSession.isEmpty())) {
                 this.whiteSession =sessionId;
-                return ResponseData.success("Join success", Map.of("room", this.toJson()));
+                return ResponseData.success("Join success", Map.of("room", this.id));
             } else {
                 return ResponseData.error("Player is already exist");
             }
@@ -162,9 +162,9 @@ public class GameServlet extends HttpServlet {
 
         public ResponseData getData() {
             if (this.game == null) {
-                return ResponseData.error("Game is not ready");
+                return ResponseData.error("Game has not started yet");
             } else {
-                return ResponseData.success("Data", Map.of("room", this.toJson(), "game", this.game.toJson()));
+                return ResponseData.success("Data", Map.of("room", this.id, "game", this.game.toJson()));
             }
         }
 
@@ -180,12 +180,6 @@ public class GameServlet extends HttpServlet {
                 }
             }
             return ResponseData.error("Put down failed");
-        }
-
-        public String toJson() {
-            StringBuilder sb = new StringBuilder();
-            sb.append("{id:\"").append(this.id).append("\",black:\"").append(this.blackSession).append("\",white:\"").append(this.whiteSession).append("\"}");
-            return sb.toString();
         }
     }
 }
