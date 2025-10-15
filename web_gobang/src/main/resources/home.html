@@ -24,35 +24,79 @@ header {
 }
 #controls {
   margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
 }
-select, button {
-  margin: 5px;
-  padding: 6px 10px;
+#controls button {
+  padding: 8px 16px;
   font-size: 14px;
+  cursor: pointer;
+  background: #8b6914;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  transition: background 0.3s;
+}
+#controls button:hover {
+  background: #6b4d0d;
+}
+#controls select {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 2px solid #8b6914;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
 }
 #players {
   display: flex;
   justify-content: space-between;
   width: 600px;
   margin-bottom: 10px;
+  gap: 20px;
 }
-#players div {
+.player-box {
   text-align: center;
-  width: 200px;
+  flex: 1;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: 3px solid transparent;
+}
+.player-box:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+.player-box.selected {
+  border-color: #8b6914;
+  background: rgba(139, 105, 20, 0.2);
+}
+.player-box .player-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #333;
+}
+.player-box .player-id {
   font-size: 14px;
+  color: #666;
+  word-break: break-all;
 }
 
-/* 传统棋盘风格 */
 #board {
   position: relative;
   width: 480px;
   height: 480px;
-  background: #d8b36e; /* 木色背景 */
+  background: #d8b36e;
   border: 6px solid #654321;
   box-shadow: 0 0 8px rgba(0,0,0,0.5);
 }
 
-/* 绘制格线 */
 #board::before {
   content: "";
   position: absolute;
@@ -64,7 +108,6 @@ select, button {
   pointer-events: none;
 }
 
-/* 棋子样式 */
 .cell {
   position: absolute;
   width: 28px;
@@ -76,17 +119,25 @@ select, button {
 .cell.black {
   background: radial-gradient(circle at 35% 35%, #333, #000);
   box-shadow: inset -2px -2px 4px rgba(255,255,255,0.3);
+  cursor: default;
 }
 .cell.white {
   background: radial-gradient(circle at 35% 35%, #fff, #ccc);
   box-shadow: inset -2px -2px 4px rgba(0,0,0,0.3);
+  cursor: default;
+}
+.cell.empty {
+  background: transparent;
+  cursor: pointer;
+}
+.cell.empty:hover {
+  background: rgba(100, 100, 100, 0.3);
 }
 .cell.gray {
   background: transparent;
   cursor: not-allowed;
 }
 
-/* 星位点 */
 .star {
   position: absolute;
   width: 6px;
@@ -100,6 +151,11 @@ select, button {
   margin-top: 10px;
   font-size: 16px;
   font-weight: bold;
+  color: #333;
+}
+
+.hidden {
+  display: none;
 }
 </style>
 </head>
@@ -112,27 +168,24 @@ select, button {
     <select id="roomList" onchange="selectRoom()">
       <option value="">-- Select Room --</option>
     </select>
-    <button onclick="refreshRooms()">Refresh</button>
-    <button onclick="joinRoom('B')">Join as Black</button>
-    <button onclick="joinRoom('W')">Join as White</button>
-    <button onclick="getRoomData()">Get Data</button>
+    <button id="startGameBtn" class="hidden" onclick="startGame()">Start Game</button>
   </div>
 </header>
 
 <div id="players">
-  <div>
-    <div>Black</div>
-    <div id="blackId">---</div>
+  <div class="player-box" id="blackBox" onclick="joinAsPlayer('B')">
+    <div class="player-title">⚫ Black</div>
+    <div class="player-id" id="blackId">Click to join</div>
   </div>
-  <div>
-    <div>White</div>
-    <div id="whiteId">---</div>
+  <div class="player-box" id="whiteBox" onclick="joinAsPlayer('W')">
+    <div class="player-title">⚪ White</div>
+    <div class="player-id" id="whiteId">Click to join</div>
   </div>
 </div>
 
 <div id="board"></div>
 
-<div id="status">Waiting...</div>
+<div id="status">Create or select a room to start</div>
 
 <script>
 const boardElem = document.getElementById('board');
@@ -140,18 +193,22 @@ const sessionElem = document.getElementById('session');
 const statusElem = document.getElementById('status');
 const blackElem = document.getElementById('blackId');
 const whiteElem = document.getElementById('whiteId');
+const blackBox = document.getElementById('blackBox');
+const whiteBox = document.getElementById('whiteBox');
 const roomSelect = document.getElementById('roomList');
+
 let sessionId = "";
 let selectedRoom = "";
 let stones = [];
 let gameActive = false;
-let myColor = null;
+let myColor = 'O'; // 'B' = Black, 'W' = White, 'O' = Observer
+let heartbeatInterval = null;
+let roomData = null;
 
 const CELL_SIZE = 480 / 15;
+const HEARTBEAT_INTERVAL = 1500;
 
-// 初始化棋盘（不再用grid，而是定位棋子）
 function initBoard() {
-  // 绘制星位点（传统布局）
   const stars = [
     [3,3], [3,11],
     [7,7],
@@ -165,7 +222,6 @@ function initBoard() {
     boardElem.appendChild(s);
   }
 
-  // 创建棋位
   for (let i = 0; i < 15 * 15; i++) {
     const cell = document.createElement("div");
     cell.className = "cell gray";
@@ -184,16 +240,24 @@ window.onload = async () => {
   initBoard();
   sessionId = await fetchSessionId();
   sessionElem.textContent = sessionId;
-  refreshRooms();
+  loadRoomList();
 };
 
-// 获取 Session ID（通过访问服务器建立 session）
 async function fetchSessionId() {
   return fetch('/game?action=list')
-    .then(res => res.text()) // 只是触发 session 创建
+    .then(res => res.text())
     .then(() => {
       const cookie = document.cookie.match(/JSESSIONID=([^;]+)/);
-      return cookie ? cookie[1] : "(none)";
+      if (cookie) {
+        // 移除可能的路由后缀（如 .node0, .node1 等）
+        let sessionId = cookie[1];
+        const dotIndex = sessionId.indexOf('.');
+        if (dotIndex !== -1) {
+          sessionId = sessionId.substring(0, dotIndex);
+        }
+        return sessionId;
+      }
+      return "(none)";
     })
     .catch(err => {
       console.error("Failed to fetch session:", err);
@@ -201,14 +265,12 @@ async function fetchSessionId() {
     });
 }
 
-// 刷新房间列表
-function refreshRooms() {
+function loadRoomList() {
   return fetch('/game?action=list')
     .then(res => res.json())
     .then(data => {
-      console.log("data:", data);
       roomSelect.innerHTML = '<option value="">-- Select Room --</option>';
-      const map = data.map || (data.data && data.data.map) || {};
+      const map = data.map || {};
       for (const [id, roomJson] of Object.entries(map)) {
         const option = document.createElement('option');
         option.value = id;
@@ -216,72 +278,225 @@ function refreshRooms() {
         roomSelect.appendChild(option);
       }
     })
-    .catch(err => console.error("Failed to refresh rooms:", err));
+    .catch(err => console.error("Failed to load rooms:", err));
 }
 
-// 创建房间
 function createRoom() {
   fetch('/game?action=create')
     .then(res => res.json())
     .then(data => {
-      alert(data.message);
-      console.log("data:", data);
-      refreshRooms();
+      if (data.map && data.map.room) {
+        const newRoomId = data.map.room;
+        loadRoomList().then(() => {
+          setTimeout(() => {
+            roomSelect.value = newRoomId;
+            selectRoom();
+          }, 100);
+        });
+        statusElem.textContent = "Room created! Entering room...";
+      } else {
+        statusElem.textContent = data.message || "Failed to create room";
+      }
     })
-    .catch(err => console.error("Create room failed:", err));
+    .catch(err => {
+      console.error("Create room failed:", err);
+      statusElem.textContent = "Failed to create room";
+    });
 }
 
-// 选择房间
 function selectRoom() {
   selectedRoom = roomSelect.value;
   if (!selectedRoom) {
     statusElem.textContent = "No room selected.";
+    stopHeartbeat();
+    clearBoard();
+    resetPlayerDisplay();
+    document.getElementById('startGameBtn').classList.add('hidden');
     return;
   }
-  getRoomData();
+  startHeartbeat();
+  statusElem.textContent = "Room selected. Click a color to join.";
 }
 
-// 加入房间
-function joinRoom(color) {
-  if (!selectedRoom) return alert("Select a room first!");
-  fetch(`/game?action=join&id=${selectedRoom}&color=${color}`)
+function joinAsPlayer(color) {
+  if (!selectedRoom) {
+    statusElem.textContent = "Please select a room first!";
+    return;
+  }
+  
+  if (roomData) {
+    if (color === 'B' && roomData.black) {
+      statusElem.textContent = "Black player already exists!";
+      return;
+    }
+    if (color === 'W' && roomData.white) {
+      statusElem.textContent = "White player already exists!";
+      return;
+    }
+  }
+  
+  fetch(`/game`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      action: 'join',
+      id: selectedRoom,
+      color: color
+    })
+  })
     .then(res => res.json())
     .then(data => {
-      alert(data.message);
-      if (data.status == 200) {
+      if (data.map && data.map.room) {
         myColor = color;
-        getRoomData();
+        updatePlayerSelection();
+        statusElem.textContent = `Joined as ${color === 'B' ? 'Black' : 'White'}. Waiting for opponent...`;
+        setTimeout(() => getRoomData(), 200);
+      } else {
+        statusElem.textContent = data.message || "Failed to join";
       }
     })
-    .catch(err => console.error("Join room failed:", err));
+    .catch(err => {
+      console.error("Join room failed:", err);
+      statusElem.textContent = "Failed to join room";
+    });
 }
 
-// 获取房间和棋盘数据
-function getRoomData() {
-  if (!selectedRoom) return alert("Select a room first!");
-  fetch(`/game?action=data&id=${selectedRoom}`)
-    .then(res => {
-      if (!res.ok) {  // 判断 HTTP status
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      return res.json();
-    })
+function updatePlayerSelection() {
+  blackBox.classList.remove('selected');
+  whiteBox.classList.remove('selected');
+  
+  if (myColor === 'B') {
+    blackBox.classList.add('selected');
+  } else if (myColor === 'W') {
+    whiteBox.classList.add('selected');
+  }
+}
+
+function startGame() {
+  if (!selectedRoom) {
+    statusElem.textContent = "Select a room first!";
+    return;
+  }
+  
+  fetch(`/game?action=start&id=${selectedRoom}`)
+    .then(res => res.json())
     .then(data => {
-      parsed = JSON.parse(data.data.game);
-      renderBoard(parsed.board);
-      statusElem.textContent = parsed.status;
-      const room = JSON.parse(data.data.room);
-      blackElem.textContent = room.black || "---";
-      whiteElem.textContent = room.white || "---";
-      gameActive = parsed.status !== "Game over";
+      if (data.map) {
+        statusElem.textContent = "Game started!";
+        document.getElementById('startGameBtn').classList.add('hidden');
+        setTimeout(() => getRoomData(), 200);
+      } else {
+        statusElem.textContent = data.message || "Failed to start game";
+      }
     })
-    .catch(err => console.error("Get room data failed:", err));
+    .catch(err => {
+      console.error("Start game failed:", err);
+      statusElem.textContent = "Failed to start game";
+    });
 }
 
-// 落子
+function getRoomData() {
+  if (!selectedRoom) return;
+  
+  fetch(`/game?action=data&id=${selectedRoom}`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data.map) {
+        statusElem.textContent = data.message || "Game not started";
+        gameActive = false;
+        return;
+      }
+      
+      try {
+        // 解析游戏数据
+        let gameData = null;
+        if (data.map.game) {
+          gameData = typeof data.map.game === 'string' 
+            ? JSON.parse(data.map.game) 
+            : data.map.game;
+        }
+        
+        // 解析房间数据
+        roomData = {
+          id: data.map.roomId || selectedRoom,
+          black: data.map.blackPlayer || '',
+          white: data.map.whitePlayer || '',
+          status: data.map.roomStatus || 'waiting'
+        };
+        
+        // 更新玩家显示
+        blackElem.textContent = roomData.black || "Click to join";
+        whiteElem.textContent = roomData.white || "Click to join";
+        
+        // 同步 myColor
+        if (roomData.black === sessionId) {
+          myColor = 'B';
+        } else if (roomData.white === sessionId) {
+          myColor = 'W';
+        } else {
+          myColor = 'O'; // 观众
+        }
+        
+        updatePlayerSelection();
+        
+        // 根据房间状态更新 gameActive 和界面
+        if (roomData.status === 'playing' && gameData && gameData.board) {
+          // 游戏进行中
+          renderBoard(gameData.board);
+          gameActive = true;
+          statusElem.textContent = gameData.status || "Playing";
+          document.getElementById('startGameBtn').classList.add('hidden');
+        } else if (roomData.status === 'finished' && gameData) {
+          // 游戏已结束
+          renderBoard(gameData.board);
+          gameActive = false;
+          statusElem.textContent = gameData.status || "Game over";
+          document.getElementById('startGameBtn').classList.add('hidden');
+        } else if (roomData.status === 'ready') {
+          // 双方都已加入，可以开始
+          clearBoard();
+          gameActive = false;
+          statusElem.textContent = "Both players ready. Click Start Game!";
+          document.getElementById('startGameBtn').classList.remove('hidden');
+        } else {
+          // 等待玩家加入
+          clearBoard();
+          gameActive = false;
+          statusElem.textContent = "Waiting for players to join...";
+          document.getElementById('startGameBtn').classList.add('hidden');
+        }
+        
+      } catch (e) {
+        console.error("Parse error:", e);
+        statusElem.textContent = "Error parsing data";
+        gameActive = false;
+      }
+    })
+    .catch(err => {
+      console.error("Get room data failed:", err);
+      statusElem.textContent = "Error loading data";
+      gameActive = false;
+    });
+}
+
 function placeStone(index) {
-  if (!gameActive) return;
-  if (!myColor) return alert("Join as a player first!");
+  // 检查：必须是游戏进行中
+  if (!gameActive) {
+    statusElem.textContent = "Game not started or already over!";
+    return;
+  }
+  
+  // 检查：必须是玩家（不是观众）
+  if (myColor === 'O') {
+    statusElem.textContent = "You are observing. Join as a player to play!";
+    return;
+  }
+  
+  // 转换索引
+  const x = index % 15;
+  const y = Math.floor(index / 15);
+  const tableIndex = (y + 4) * 23 + (x + 4);
+  
   fetch(`/game`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -289,31 +504,97 @@ function placeStone(index) {
       action: 'next',
       id: selectedRoom,
       color: myColor,
-      index: index
+      index: tableIndex
     })
   })
     .then(res => res.json())
     .then(data => {
-      if (data.status === "success") {
+      if (data.map) {
         getRoomData();
       } else {
-        alert(data.message);
+        statusElem.textContent = data.message || "Move failed";
       }
     })
-    .catch(err => console.error("Place stone failed:", err));
+    .catch(err => {
+      console.error("Place stone failed:", err);
+      statusElem.textContent = "Failed to place stone";
+    });
 }
 
-// 渲染棋盘
 function renderBoard(boardStr) {
-  for (let i = 0; i < 15 * 15; i++) {
+  if (!boardStr || boardStr.length !== 225) {
+    console.error("Invalid board string");
+    return;
+  }
+  
+  console.log("Rendering board:");
+  let stoneCount = 0;
+  
+  for (let i = 0; i < 225; i++) {
     const c = boardStr[i];
     const cell = stones[i];
     cell.className = "cell";
-    if (c === "B") cell.classList.add("black");
-    else if (c === "W") cell.classList.add("white");
-    else if (gameActive) cell.classList.add("empty");
-    else cell.classList.add("gray");
+    
+    if (c === 'B') {
+      cell.classList.add("black");
+      const x = i % 15;
+      const y = Math.floor(i / 15);
+      console.log(`Black stone at board[${i}] = (${x}, ${y})`);
+      stoneCount++;
+    } else if (c === 'W') {
+      cell.classList.add("white");
+      const x = i % 15;
+      const y = Math.floor(i / 15);
+      console.log(`White stone at board[${i}] = (${x}, ${y})`);
+      stoneCount++;
+    } else if (c === '_') {
+      if (gameActive) {
+        cell.classList.add("empty");
+      } else {
+        cell.classList.add("gray");
+      }
+    } else {
+      if (gameActive) {
+        cell.classList.add("empty");
+      } else {
+        cell.classList.add("gray");
+      }
+    }
   }
+  
+  console.log(`Total stones: ${stoneCount}`);
+}
+
+function startHeartbeat() {
+  stopHeartbeat();
+  heartbeatInterval = setInterval(() => {
+    if (selectedRoom) {
+      getRoomData();
+    }
+  }, HEARTBEAT_INTERVAL);
+  getRoomData();
+}
+
+function stopHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+}
+
+function clearBoard() {
+  for (let i = 0; i < 225; i++) {
+    stones[i].className = "cell gray";
+  }
+}
+
+function resetPlayerDisplay() {
+  blackElem.textContent = "Click to join";
+  whiteElem.textContent = "Click to join";
+  blackBox.classList.remove('selected');
+  whiteBox.classList.remove('selected');
+  myColor = 'O';
+  roomData = null;
 }
 </script>
 

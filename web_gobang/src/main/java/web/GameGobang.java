@@ -61,22 +61,20 @@ public class GameGobang {
      * @return true 表示落子成功，false 表示无效操作
      */
     public boolean next(char color, int index) {
-        // 游戏已结束
-        if (this.status == Status.OVER) return false;
-
-        // 检查棋子颜色是否合法
-        if (color != BLACK && color != WHITE) return false;
 
         // 检查该位置是否为空
         if (this.table[index] != SPACE) return false;
 
-        // 落子
-        this.table[index] = color;
+        if (this.status == Status.BLACK && color == BLACK || this.status == Status.WHITE && color == WHITE) {
+            // 落子
+            this.table[index] = color;
 
-        // 检查胜负并切换回合
-        run();
+            // 检查胜负并切换回合
+            run();
+            return true;
+        }
 
-        return true;
+        return false;
     }
 
     /**
@@ -85,7 +83,7 @@ public class GameGobang {
     public Map<String, Object> toJsonObject() {
         return Map.of(
             "status", this.status.getDescription(),
-            "board", this.board
+            "board", new String(this.board)
         );
     }
 
@@ -182,7 +180,11 @@ public class GameGobang {
     private void copy() {
         for (int i = 0; i < this.board.length; i++) {
             // 偏移 4 行 4 列（即跳过 OUT 区域）
-            this.board[i] = this.table[i + 4 * 23 + 4];
+            int x = i % 15;  // board 的列（0-14）
+            int y = i / 15;  // board 的行（0-14）
+            // table 中对应的位置：行 y+4，列 x+4
+            int tableIndex = (y + 4) * 23 + (x + 4);
+            this.board[i] = this.table[tableIndex];
         }
     }
 }

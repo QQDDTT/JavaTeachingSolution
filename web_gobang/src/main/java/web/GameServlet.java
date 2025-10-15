@@ -49,11 +49,21 @@ public class GameServlet extends HttpServlet {
                     ResponseData.error("Game is not exist").sendJson(resp);
                     return;
                 }
-                if (color == null || color.charAt(0) != GameGobang.WHITE || color.charAt(0) != GameGobang.BLACK) {
+                if (color == null || color.length() > 1 || (color.charAt(0) != GameGobang.WHITE && color.charAt(0) != GameGobang.BLACK)) {
                     ResponseData.error("Color is error").sendJson(resp);
                     return;
                 }
                 GAME_MAP.get(gameId).join(sessionId, color).sendJson(resp);
+                return;
+            }
+            case "start" -> {
+                String gameId = req.getParameter("id");
+                if (gameId == null || !GAME_MAP.keySet().contains(gameId)) {
+                    ResponseData.error("Game is not exist").sendJson(resp);
+                    return;
+                }
+                GAME_MAP.get(gameId).start().sendJson(resp);
+                return;
             }
             case "data" -> {
                 String gameId = req.getParameter("id");
@@ -62,9 +72,11 @@ public class GameServlet extends HttpServlet {
                     return;
                 }
                 GAME_MAP.get(gameId).getData().sendJson(resp);
+                return;
             }
             default -> {
                 ResponseData.error("Unknow action : " + action).sendJson(resp);
+                return;
             }
         }
     }
@@ -113,10 +125,11 @@ public class GameServlet extends HttpServlet {
     }
 
     public static class Room {
-        private final  String id;
+        private final String id;
         private String blackSession;
         private String whiteSession;
         private GameGobang game;
+        private String status; // 新增：游戏状态
 
         public Room() {
             this(LocalDateTime.now().toString());
@@ -124,30 +137,47 @@ public class GameServlet extends HttpServlet {
 
         public Room(String id) {
             this.id = id;
+            this.status = "waiting"; // 初始状态：等待玩家
         }
 
         public String getBlakSession() {
             return this.blackSession;
         }
+        
         public void setBlackSession(String session) {
             this.blackSession = session;
         }
+        
         public String getWhiteSession() {
             return this.whiteSession;
         }
+        
         public void setWhiteSession(String session) {
             this.whiteSession = session;    
         }
+        
         public String getId() {
             return this.id;
+        }
+        
+        public String getStatus() {
+            return this.status;
         }
 
         public ResponseData join(String sessionId, String color) {
             if (color.charAt(0) == GameGobang.BLACK && (this.blackSession == null || this.blackSession.isEmpty())) {
                 this.blackSession = sessionId;
+                // 检查是否双方都已加入
+                if (this.whiteSession != null && !this.whiteSession.isEmpty()) {
+                    this.status = "ready"; // 双方都已加入，准备开始
+                }
                 return ResponseData.success("Join success", Map.of("room", this.id));
             } else if (color.charAt(0) == GameGobang.WHITE && (this.whiteSession == null || this.whiteSession.isEmpty())) {
-                this.whiteSession =sessionId;
+                this.whiteSession = sessionId;
+                // 检查是否双方都已加入
+                if (this.blackSession != null && !this.blackSession.isEmpty()) {
+                    this.status = "ready"; // 双方都已加入，准备开始
+                }
                 return ResponseData.success("Join success", Map.of("room", this.id));
             } else {
                 return ResponseData.error("Player is already exist");
@@ -155,26 +185,44 @@ public class GameServlet extends HttpServlet {
         }
 
         public ResponseData start() {
-            if (this.blackSession == null || this.whiteSession == null) return ResponseData.error("Player in not ready");
+            if (this.blackSession == null || this.whiteSession == null) {
+                return ResponseData.error("Player is not ready");
+            }
             this.game = new GameGobang();
+            this.status = "playing"; // 游戏进行中
             return ResponseData.success("Started", Map.of("game", this.game.toJson()));
         }
 
         public ResponseData getData() {
-            if (this.game == null) {
-                return ResponseData.error("Game has not started yet");
-            } else {
-                return ResponseData.success("Data", Map.of("room", this.id, "game", this.game.toJson()));
+            Map<String, String> result = new HashMap<>();
+            result.put("roomId", this.id);
+            result.put("blackPlayer", this.blackSession != null ? this.blackSession : "");
+            result.put("whitePlayer", this.whiteSession != null ? this.whiteSession : "");
+            result.put("roomStatus", this.status); // 新增：返回房间状态
+            
+            if (this.game != null) {
+                result.put("game", this.game.toJson());
+                // 检查游戏是否结束
+                String gameStatus = this.game.toJsonObject().get("status").toString();
+                if (gameStatus.toLowerCase().contains("over")) {
+                    this.status = "finished"; // 游戏已结束
+                    result.put("roomStatus", this.status);
+                }
             }
+            
+            return ResponseData.success("Room data", result);
         }
 
         public ResponseData next(String sessionId, int index) {
-            if (sessionId == this.blackSession) {
+            if (this.game == null) {
+                return ResponseData.error("Game not started");
+            }
+            
+            if (sessionId.equals(this.blackSession)) {
                 if (this.game.next(GameGobang.BLACK, index)) {
                     return ResponseData.success("Put down", Map.of("color", "B", "index", "" + index));
                 }
-            } 
-            if (sessionId == this.whiteSession) {
+            } else if (sessionId.equals(this.whiteSession)) {
                 if (this.game.next(GameGobang.WHITE, index)) {
                     return ResponseData.success("Put down", Map.of("color", "W", "index", "" + index));
                 }
