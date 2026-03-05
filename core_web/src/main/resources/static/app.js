@@ -7,14 +7,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const projectSelect = document.getElementById("projectSelect");
     const statusBar = document.getElementById("statusBar");
     const fileList = document.getElementById("fileList");
-
+    const fileList = document.getElementById("fileList");
 
     const editor = document.getElementById("editor");
+    const compileBtn = document.getElementById("compileBtn");
+    const renderBtn = document.getElementById("renderBtn");
 
     const newProjectModal = document.getElementById("newProjectModal");
     const createProjectBtn = document.getElementById("createProjectBtn");
     const cancelProjectBtn = document.getElementById("cancelProjectBtn");
-    
+
     const newFileModal = document.getElementById("newFileModal");
     const createFileBtn = document.getElementById("createFileBtn");
     const cancelFileBtn = document.getElementById("cancelFileBtn");
@@ -23,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let failCount = 0;
     const maxFail = 5;
     let currentFilePath = "";
+    let currentProjectName = "";
 
     // --- 系统操作 ---
     async function systemAction(action) {
@@ -53,9 +56,9 @@ document.addEventListener("DOMContentLoaded", () => {
             viewStatus(data.message, "red");
         }
     }
-    document.getElementById("restartBtn").addEventListener("click", function() {systemAction("restart")});
-    document.getElementById("closeBtn").addEventListener("click", function() {systemAction("close")});
-    
+    document.getElementById("restartBtn").addEventListener("click", function () { systemAction("restart") });
+    document.getElementById("closeBtn").addEventListener("click", function () { systemAction("close") });
+
 
     // --- 状态栏 ---
     function viewStatus(text, color = "white") {
@@ -111,6 +114,20 @@ document.addEventListener("DOMContentLoaded", () => {
         executeCommand();
     });
 
+    const terminalPrompt = document.getElementById("terminalPrompt");
+    const terminalInputBar = document.getElementById("consoleInputBar");
+    function updateTerminalPrompt(path, project) {
+        let displayPath = path;
+        if (project && displayPath.startsWith(".")) {
+            displayPath = path.replace(".", project);
+        }
+        terminalPrompt.innerText = `~/` + displayPath + ` $`;
+    }
+
+    consoleInput.addEventListener("input", () => {
+        terminalInputBar.setAttribute("data-value", consoleInput.value);
+    });
+
     let polling = false;
 
     function startExecutor() {
@@ -125,7 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function closeExecutor() {
         fetch(`/terminal?action=close`)
             .then(res => res.json().then(data => ({ ...data, status: res.status })))
-            .then(({ status, message, map}) => {
+            .then(({ status, message, map }) => {
                 viewStatus(message, status == 200 ? "green" : "red");
             })
             .catch(err => viewStatus(`Close executor failed : ${err}`));
@@ -146,6 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 consoleInput.value = "";
                 if (map.path) {
                     current_path = map.path;
+                    updateTerminalPrompt(current_path, currentProjectName);
                 }
                 if (map.running == 1) {
                     polling = true;
@@ -163,7 +181,10 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(res => res.json().then(data => ({ ...data, status: res.status })))
             .then(({ status, message, map }) => {
                 if (status === 200) {
-                    if (map.path) current_path = map.path;
+                    if (map.path) {
+                        current_path = map.path;
+                        updateTerminalPrompt(current_path, currentProjectName);
+                    }
                     if (map.out) map.out.split("\n").forEach(line => line && appendConsole(line, "out"));
                     if (map.err) map.err.split("\n").forEach(line => line && appendConsole(line, "err"));
 
@@ -189,6 +210,38 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("refreshBtn").addEventListener("click", () => readFile());
     document.getElementById("saveBtn").addEventListener("click", () => writeFile());
 
+    compileBtn.addEventListener("click", () => {
+        if (!currentFilePath) {
+            viewStatus("Please select a file to compile", "red");
+            return;
+        }
+        let command = "";
+        if (currentFilePath.endsWith(".java")) {
+            command = `javac ${currentFilePath} && java ${currentFilePath.replace(".java", "")}`;
+        } else {
+            command = prompt("Enter compile/run command:", "make run");
+        }
+        if (command) {
+            tabs[0].btn.click(); // Switch to Terminal
+            consoleInput.value = command;
+            terminalInputBar.setAttribute("data-value", command);
+            executeCommand();
+        }
+    });
+
+    renderBtn.addEventListener("click", () => {
+        if (!currentFilePath) {
+            viewStatus("Please select a HTML file to render", "red");
+            return;
+        }
+        // Retrieve the content currently shown in the editor instead of refetching
+        const content = editor.value;
+        const win = window.open("", "_blank");
+        win.document.write(content);
+        win.document.close();
+        viewStatus("Rendered in new tab", "green");
+    });
+
     // --- 项目管理 ---
     function refreshProjectList() {
         fetch("/project?action=projects")
@@ -196,7 +249,7 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(({ status, message, map }) => {
                 if (status != 200) {
                     viewStatus(message, "resd");
-                    return 
+                    return
                 }
                 viewStatus(message, "green");
                 while (projectSelect.firstChild) projectSelect.removeChild(projectSelect.firstChild);
@@ -236,7 +289,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (value == "File") {
                         const div = document.createElement("div");
                         div.innerHTML = key;
-                        div.addEventListener("click", function() {
+                        div.addEventListener("click", function () {
                             currentFilePath = key;
                             readFile();
                         });
@@ -250,10 +303,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 fileList.appendChild(add);
             })
-            .catch (err => viewStatus(`Get files list failed :${err}`, "red"));
+            .catch(err => viewStatus(`Get files list failed :${err}`, "red"));
     }
 
-    projectSelect.addEventListener("change", () => listProjectFiles());
+    projectSelect.addEventListener("change", () => {
+        currentProjectName = projectSelect.value;
+        listProjectFiles();
+        updateTerminalPrompt(current_path, currentProjectName);
+    });
 
     function cleanEditor() { editor.innerHTML = ""; }
 
@@ -264,13 +321,13 @@ document.addEventListener("DOMContentLoaded", () => {
             .then(({ status, message, map }) => {
                 if (status != 200) {
                     viewStatus(message, "red");
-                    return;    
+                    return;
                 }
                 viewStatus(`${message}: ${map.file}`, "green");
                 cleanEditor();
                 editor.value = map.content;
             })
-            .catch (err => viewStatus(`Read file failed : ${err}`, "red"));
+            .catch(err => viewStatus(`Read file failed : ${err}`, "red"));
     }
 
     function writeFile() {
@@ -283,11 +340,11 @@ document.addEventListener("DOMContentLoaded", () => {
             },
             body: content
         })
-        .then(res => res.json().then(data => ({ ...data, status: res.status })))
-        .then(({ status, message }) => {
-            viewStatus(message, status == 200 ? "green" : "red");
-        })
-        .catch(err => viewStatus(`Write file failed: ${err}`, "red"));
+            .then(res => res.json().then(data => ({ ...data, status: res.status })))
+            .then(({ status, message }) => {
+                viewStatus(message, status == 200 ? "green" : "red");
+            })
+            .catch(err => viewStatus(`Write file failed: ${err}`, "red"));
     }
 
     createProjectBtn.addEventListener("click", () => {
@@ -295,12 +352,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const projectName = document.getElementById("projectName").value;
         viewStatus(`Create project : ${projectType} ${projectName}`);
     });
-    cancelProjectBtn.addEventListener("click", function(){
+    cancelProjectBtn.addEventListener("click", function () {
         newProjectModal.style.display = "none";
         document.getElementById("projectName").value = "";
     });
 
-    
+
     createFileBtn.addEventListener("click", () => {
         const fileType = document.getElementById("fileType").value;
         const filePath = document.getElementById("filePath").value;
@@ -310,7 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
         newFileModal.style.display = "none";
         document.getElementById("filePath").value = "";
     });
-    
+
     // --- 休眠控制 ---
     function enterSleep() {
         sleepOverlay.style.display = "flex";
@@ -327,17 +384,17 @@ document.addEventListener("DOMContentLoaded", () => {
         fetch("/heartbeat")
             .then(res => res.text())
             .then(text => {
-                if(text.trim() === "OK") {
+                if (text.trim() === "OK") {
                     failCount = 0;
                     exitSleep();
                 } else {
                     failCount++;
-                    if(failCount >= maxFail) enterSleep();
+                    if (failCount >= maxFail) enterSleep();
                 }
             })
             .catch(err => {
                 failCount++;
-                if(failCount >= maxFail) enterSleep();
+                if (failCount >= maxFail) enterSleep();
             });
     }
 

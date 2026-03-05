@@ -10,7 +10,7 @@
     <!-- 工具栏 -->
     <div id="toolbar">
         <div class="left-buttons">
-            <button id="consoleBtn" class="tab-btn active" data-tab="consoleTab">Console</button>
+            <button id="consoleBtn" class="tab-btn active" data-tab="consoleTab">Terminal</button>
             <button id="editorBtn" class="tab-btn" data-tab="editorTab">Editor</button>
         </div>
         <div id="statusBarContainer">
@@ -24,7 +24,7 @@
 
     <!-- 主体 -->
     <div id="main">
-        <!-- 控制台 -->
+        <!-- 终端 -->
         <div id="consoleTab" class="tab-content active">
             <div id="consoleToolbar">
                 <button id="startTerminalBtn" class="icon-btn start" title="Start Terminal">▶</button>
@@ -32,7 +32,9 @@
             </div>
             <div id="consoleOutput"></div>
             <div id="consoleInputBar">
-                <input id="consoleInput" type="text" placeholder="Input command..." />
+                <span id="terminalPrompt">~ $</span>
+                <input id="consoleInput" type="text" placeholder="Input command..." autocomplete="off" />
+                <span id="terminalCursor"></span>
                 <button id="sendConsoleBtn">send</button>
             </div>
         </div>
@@ -50,11 +52,16 @@
                 <div id="dragHandle"></div>
 
                 <!-- 编辑器文本区域 -->
-                <textarea id="editor"></textarea>
-            </div>
-            <div id="editorToolbar">
-                <button id="refreshBtn">refresh</button>
-                <button id="saveBtn">save</button>
+                <div id="editorContentArea">
+                    <div id="editorToolbar">
+                        <button id="refreshBtn" class="toolbar-btn">Refresh</button>
+                        <button id="saveBtn" class="toolbar-btn">Save</button>
+                        <div class="spacer"></div>
+                        <button id="compileBtn" class="toolbar-btn action-btn">Compile</button>
+                        <button id="renderBtn" class="toolbar-btn action-btn">Render</button>
+                    </div>
+                    <textarea id="editor" spellcheck="false"></textarea>
+                </div>
             </div>
         </div>
     </div>

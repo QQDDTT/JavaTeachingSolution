@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  core_web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+
+# 请确保将服务配置完善，并支持实际的容器化部署。
