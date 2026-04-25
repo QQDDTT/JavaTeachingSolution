@@ -46,7 +46,7 @@ public class ProjectServlet extends HttpServlet {
             case "list" -> {
                 String project = req.getParameter("project");
                 ProjectManager pm = MANAGER_MAP.get(sessionId);
-                if (pm == null) {
+                if (pm == null || !pm.getProject().equals(project)) {
                     pm = new ProjectManager(project);
                     MANAGER_MAP.put(sessionId, pm);
                 }
@@ -55,7 +55,7 @@ public class ProjectServlet extends HttpServlet {
             case "read_file" -> {
                 String project = req.getParameter("project");
                 ProjectManager pm = MANAGER_MAP.get(sessionId);
-                if (pm == null || pm.getProject().equals(project)) {
+                if (pm == null || !pm.getProject().equals(project)) {
                     ResponseData.error("Project [" + project + "] does not match sessionID").sendJson(resp);
                     return; 
                 }
@@ -81,7 +81,7 @@ public class ProjectServlet extends HttpServlet {
             case "write_file" -> {
                 String project = req.getParameter("project");
                 ProjectManager pm = MANAGER_MAP.get(sessionId);
-                if (pm == null || pm.getProject().equals(project)) {
+                if (pm == null || !pm.getProject().equals(project)) {
                     ResponseData.error("Project does not match sessionID").sendJson(resp);
                     return;
                 }

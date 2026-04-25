@@ -7,9 +7,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const projectSelect = document.getElementById("projectSelect");
     const statusBar = document.getElementById("statusBar");
     const fileList = document.getElementById("fileList");
-    const fileList = document.getElementById("fileList");
 
-    const editor = document.getElementById("editor");
+    const monacoContainer = document.getElementById("monacoEditor");
     const compileBtn = document.getElementById("compileBtn");
     const renderBtn = document.getElementById("renderBtn");
 
@@ -26,6 +25,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const maxFail = 5;
     let currentFilePath = "";
     let currentProjectName = "";
+
+    // Monaco Editor 实例
+    let editor = null;
+    // 记录展开的文件夹路径
+    const expandedFolders = new Set();
 
     // --- 系统操作 ---
     async function systemAction(action) {
@@ -229,13 +233,45 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // --- Monaco Editor 初始化 ---
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
+    require(['vs/editor/editor.main'], function () {
+        editor = monaco.editor.create(monacoContainer, {
+            value: "// Select a file to start editing\n",
+            language: 'java',
+            theme: 'vs-dark',
+            automaticLayout: true,
+            fontSize: 14,
+            minimap: { enabled: false },
+            scrollbar: {
+                vertical: 'visible',
+                horizontal: 'visible',
+                useShadows: false,
+                verticalScrollbarSize: 10,
+                horizontalScrollbarSize: 10
+            }
+        });
+        viewStatus("Monaco Editor loaded", "green");
+    });
+
+    /**
+     * 设置编辑器波浪线辅助函数
+     * @param {Array} markers 格式: [{ message, severity, startLineNumber, endLineNumber, startColumn, endColumn }]
+     * severity: 8 (Error), 4 (Warning), 2 (Info)
+     */
+    window.setEditorMarkers = function(markers) {
+        if (!editor || !monaco) return;
+        const model = editor.getModel();
+        monaco.editor.setModelMarkers(model, "owner", markers);
+    };
+
     renderBtn.addEventListener("click", () => {
         if (!currentFilePath) {
             viewStatus("Please select a HTML file to render", "red");
             return;
         }
-        // Retrieve the content currently shown in the editor instead of refetching
-        const content = editor.value;
+        if (!editor) return;
+        const content = editor.getValue();
         const win = window.open("", "_blank");
         win.document.write(content);
         win.document.close();
@@ -269,6 +305,116 @@ document.addEventListener("DOMContentLoaded", () => {
             .catch(err => viewStatus(`Get project list failed :${err}`, "red"));
     }
 
+    function buildTree(files) {
+        const root = {};
+        Object.entries(files).forEach(([path, type]) => {
+            const parts = path.split('/');
+            let current = root;
+            parts.forEach((part, i) => {
+                if (!current[part]) {
+                    current[part] = {
+                        name: part,
+                        type: (i === parts.length - 1) ? type : "Dir",
+                        fullPath: parts.slice(0, i + 1).join('/'),
+                        children: {}
+                    };
+                }
+                current = current[part].children;
+            });
+        });
+        return root;
+    }
+
+    function renderTree(container, nodes, indent = 0) {
+        // 先排序：文件夹在前，文件在后
+        const sortedNodes = Object.values(nodes).sort((a, b) => {
+            if (a.type !== b.type) return a.type === "Dir" ? -1 : 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        sortedNodes.forEach(node => {
+            const item = document.createElement("div");
+            item.className = "tree-item";
+            if (node.fullPath === currentFilePath) item.classList.add("active");
+
+            // 缩进
+            for (let i = 0; i < indent; i++) {
+                const space = document.createElement("span");
+                space.className = "tree-indent";
+                item.appendChild(space);
+            }
+
+            if (node.type === "Dir") {
+                // Chevron
+                const chevron = document.createElement("span");
+                chevron.className = "tree-chevron";
+                chevron.innerHTML = "▼";
+                if (!expandedFolders.has(node.fullPath)) chevron.classList.add("collapsed");
+                item.appendChild(chevron);
+
+                // Folder Icon
+                const icon = document.createElement("span");
+                icon.className = "tree-icon icon-folder";
+                icon.innerHTML = "📁";
+                item.appendChild(icon);
+
+                // Name
+                const name = document.createElement("span");
+                name.className = "folder-header";
+                name.textContent = node.name;
+                item.appendChild(name);
+
+                item.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    if (expandedFolders.has(node.fullPath)) {
+                        expandedFolders.delete(node.fullPath);
+                    } else {
+                        expandedFolders.add(node.fullPath);
+                    }
+                    renderFileList(lastFileData);
+                });
+
+                container.appendChild(item);
+
+                // 递归渲染子节点
+                if (expandedFolders.has(node.fullPath)) {
+                    renderTree(container, node.children, indent + 1);
+                }
+            } else {
+                // File Spacer (代替 Chevron)
+                const spacer = document.createElement("span");
+                spacer.className = "tree-chevron"; // 仅占位
+                item.appendChild(spacer);
+
+                // File Icon
+                const icon = document.createElement("span");
+                icon.className = "tree-icon icon-file";
+                let ext = node.name.split('.').pop().toLowerCase();
+                if (ext === "java") { icon.innerHTML = "☕"; icon.classList.add("icon-java"); }
+                else if (ext === "html") { icon.innerHTML = "🌐"; icon.classList.add("icon-html"); }
+                else { icon.innerHTML = "📄"; }
+                item.appendChild(icon);
+
+                // Name
+                const name = document.createElement("span");
+                name.textContent = node.name;
+                item.appendChild(name);
+
+                item.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    currentFilePath = node.fullPath;
+                    // 重新强调 active 状态
+                    document.querySelectorAll(".tree-item").forEach(el => el.classList.remove("active"));
+                    item.classList.add("active");
+                    readFile();
+                });
+                container.appendChild(item);
+            }
+        });
+    }
+
+    let lastFileData = {};
+
     function listProjectFiles() {
         const projectName = projectSelect.value;
         if (projectName == "create_project") {
@@ -284,26 +430,28 @@ document.addEventListener("DOMContentLoaded", () => {
                     return;
                 }
                 viewStatus(message, "green");
-                while (fileList.firstChild) fileList.removeChild(fileList.firstChild);
-                Object.entries(map).forEach(([key, value]) => {
-                    if (value == "File") {
-                        const div = document.createElement("div");
-                        div.innerHTML = key;
-                        div.addEventListener("click", function () {
-                            currentFilePath = key;
-                            readFile();
-                        });
-                        fileList.appendChild(div);
-                    }
-                });
-                const add = document.createElement("div");
-                add.innerHTML = "+";
-                add.addEventListener("click", function () {
-                    newFileModal.style.display = "flex";
-                });
-                fileList.appendChild(add);
+                lastFileData = map;
+                renderFileList(map);
             })
             .catch(err => viewStatus(`Get files list failed :${err}`, "red"));
+    }
+
+    function renderFileList(map) {
+        while (fileList.firstChild) fileList.removeChild(fileList.firstChild);
+        const tree = buildTree(map);
+        renderTree(fileList, tree);
+
+        // 添加新增按钮
+        const add = document.createElement("div");
+        add.className = "tree-item";
+        add.style.marginTop = "10px";
+        add.style.justifyContent = "center";
+        add.style.border = "1px dashed #444";
+        add.innerHTML = "<span>+ New File / Dir</span>";
+        add.addEventListener("click", function () {
+            newFileModal.style.display = "flex";
+        });
+        fileList.appendChild(add);
     }
 
     projectSelect.addEventListener("change", () => {
@@ -312,7 +460,9 @@ document.addEventListener("DOMContentLoaded", () => {
         updateTerminalPrompt(current_path, currentProjectName);
     });
 
-    function cleanEditor() { editor.innerHTML = ""; }
+    function cleanEditor() { 
+        if (editor) editor.setValue(""); 
+    }
 
     function readFile() {
         const projectName = projectSelect.value;
@@ -324,15 +474,25 @@ document.addEventListener("DOMContentLoaded", () => {
                     return;
                 }
                 viewStatus(`${message}: ${map.file}`, "green");
-                cleanEditor();
-                editor.value = map.content;
+                if (editor) {
+                    const ext = map.file.split('.').pop().toLowerCase();
+                    let lang = 'plaintext';
+                    if (ext === 'java') lang = 'java';
+                    else if (ext === 'js') lang = 'javascript';
+                    else if (ext === 'html') lang = 'html';
+                    else if (ext === 'css') lang = 'css';
+                    
+                    const model = monaco.editor.createModel(map.content, lang);
+                    editor.setModel(model);
+                }
             })
             .catch(err => viewStatus(`Read file failed : ${err}`, "red"));
     }
 
     function writeFile() {
+        if (!editor) return;
         const projectName = projectSelect.value;
-        const content = editor.value;
+        const content = editor.getValue();
         fetch(`/project?action=write_file&path=${currentFilePath}&project=${projectName}`, {
             method: "POST",
             headers: {
@@ -371,29 +531,34 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- 休眠控制 ---
     function enterSleep() {
         sleepOverlay.style.display = "flex";
-        editor.contentEditable = "false";
+        if (editor) editor.updateOptions({ readOnly: true });
     }
 
     function exitSleep() {
         sleepOverlay.style.display = "none";
-        editor.contentEditable = "true";
+        if (editor) editor.updateOptions({ readOnly: false });
     }
 
     // --- 心跳机制 ---
     function sendHeartbeat() {
         fetch("/heartbeat")
-            .then(res => res.text())
-            .then(text => {
-                if (text.trim() === "OK") {
+            .then(res => {
+                const status = res.status;
+                return res.text().then(text => ({ status, text }));
+            })
+            .then(({ status, text }) => {
+                if (status === 200 && text.trim() === "OK") {
                     failCount = 0;
                     exitSleep();
                 } else {
                     failCount++;
+                    console.warn(`Heartbeat failed (${failCount}/${maxFail}): Status ${status}, Body: ${text}`);
                     if (failCount >= maxFail) enterSleep();
                 }
             })
             .catch(err => {
                 failCount++;
+                console.error(`Heartbeat error (${failCount}/${maxFail}):`, err);
                 if (failCount >= maxFail) enterSleep();
             });
     }

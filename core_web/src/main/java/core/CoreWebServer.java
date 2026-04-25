@@ -18,19 +18,19 @@ import java.util.concurrent.Semaphore;
  */
 public class CoreWebServer {
     /** 服务器端口号 */
-    private static final int PORT = 8080;
+    private static final int PORT = 8081;
 
     /** 最大允许用户连接数（示例） */
     private static final int MAX_USER = 100;
 
-    /** 会话超时时间（分钟）*/
-    private static final int SESSION_TIMEOUT = -1;
+    /** 会话超时时间（秒，30分钟）*/
+    private static final int SESSION_TIMEOUT = 1800;
 
     /** 静态资源路径（相对于项目根目录） */
     private static final String STATIC_RESOURCE_PATH = "/META-INF/resources";
     public static void main(String[] args) throws Exception {
 
-        QueuedThreadPool threadPool = new QueuedThreadPool(10, 1, 30000);
+        QueuedThreadPool threadPool = new QueuedThreadPool(200, 8, 30000);
         Server server = new Server(threadPool);
 
         ServerConnector connector = new ServerConnector(server);
@@ -101,6 +101,12 @@ public class CoreWebServer {
                 HttpServletRequest req = (HttpServletRequest) request;
                 HttpServletResponse resp = (HttpServletResponse) response;
 
+                // 心跳请求不占用 Session 许可，直接通过
+                if ("/heartbeat".equals(req.getRequestURI())) {
+                    chain.doFilter(request, response);
+                    return;
+                }
+
                 // 获取或创建 Session
                 HttpSession session = req.getSession(true);
                 String sessionId = session.getId();
@@ -113,11 +119,13 @@ public class CoreWebServer {
                 if (isNewUser) {
                     // 若为新用户则尝试获取访问许可
                     if (!userSemaphore.tryAcquire()) {
+                        System.out.println("[SESSION] Server busy, maximum users reached. Remaining permits: " + userSemaphore.availablePermits());
                         resp.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
                         resp.setContentType("text/plain;charset=UTF-8");
                         resp.getWriter().write("Server busy, maximum users reached.");
                         return;
                     }
+                    System.out.println("[SESSION] New user permitted. Remaining permits: " + userSemaphore.availablePermits());
 
                     // 在 session 中保存用户信息
                     session.setAttribute("connectedAt", System.currentTimeMillis());
@@ -148,7 +156,7 @@ public class CoreWebServer {
                 String sessionId = se.getSession().getId();
                 if (activeUsers.remove(sessionId) != null) {
                     userSemaphore.release();
-                    System.out.println("[SESSION] User disconnected: " + sessionId);
+                    System.out.println("[SESSION] User disconnected: " + sessionId + ". Remaining permits: " + userSemaphore.availablePermits());
                 }
             }
         });

@@ -60,7 +60,7 @@
                         <button id="compileBtn" class="toolbar-btn action-btn">Compile</button>
                         <button id="renderBtn" class="toolbar-btn action-btn">Render</button>
                     </div>
-                    <textarea id="editor" spellcheck="false"></textarea>
+                    <div id="monacoEditor" style="flex:1;"></div>
                 </div>
             </div>
         </div>
@@ -103,6 +103,7 @@
     <div class="message">Sleeping...</div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

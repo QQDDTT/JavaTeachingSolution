@@ -293,33 +293,86 @@ body {
 #fileList {
     flex: 1;
     overflow-y: auto;
-    padding: 10px 0;
-}
-
-#fileList div {
-    padding: 4px 10px 4px 20px;
-    cursor: pointer;
-    font-size: 13px;
-    color: #cccccc;
+    padding: 5px 0;
     user-select: none;
 }
 
-#fileList div:hover {
+/* 树项通用样式 */
+.tree-item {
+    display: flex;
+    align-items: center;
+    padding: 3px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #cccccc;
+    white-space: nowrap;
+}
+
+.tree-item:hover {
     background: #2a2d2e;
 }
 
-#fileList div.active-file {
+.tree-item.active {
     background: #37373d;
     color: #ffffff;
 }
 
+/* 层级缩进 */
+.tree-indent {
+    display: inline-block;
+    width: 12px;
+    flex-shrink: 0;
+}
+
+/* 图标基础 */
+.tree-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+
+/* 文件夹 Chevron */
+.tree-chevron {
+    width: 16px;
+    height: 16px;
+    margin-right: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #808080;
+    transition: transform 0.15s;
+}
+
+.tree-chevron.collapsed {
+    transform: rotate(-90deg);
+}
+
+/* 文件夹头部专门样式 */
+.folder-header {
+    font-weight: 500;
+}
+
+/* 颜色点缀：文件夹黄色/橙色，文件灰色 */
+.icon-folder { color: #dcb67a; }
+.icon-file { color: #808080; }
+.icon-java { color: #e06c75; }
+.icon-html { color: #e0623d; }
+
 /* 中间拖动条 */
 #dragHandle {
-    width: 4px;
+    width: 2px;
     cursor: col-resize;
-    background: transparent;
+    background: #1e1e1e;
     flex-shrink: 0;
-    transition: background 0.2s;
+    z-index: 10;
+    transition: background 0.3s;
 }
 
 #dragHandle:hover {
