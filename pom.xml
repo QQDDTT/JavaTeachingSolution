@@ -17,6 +17,7 @@
         <module>web_demo</module>
         <module>web_game2048</module>
     <module>web_gobang</module>
+    <module>console_mockito</module>
     </modules>
 
     <dependencyManagement>
